@@ -229,7 +229,7 @@ function Sidebar({ lectures, selectedLectureId, openDashboard, setView }) {
     <aside className="sidebar">
       <div>
         <div className="brand">
-          <img src={`${API_URL}/static/logo`} alt="Aurevix" />
+          <img src="/aurevix-logo.png" alt="Aurevix" />
           <div>
             <h1>Aurevix</h1>
             <p>Speaker AI</p>
