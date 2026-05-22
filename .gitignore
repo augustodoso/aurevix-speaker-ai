@@ -1,0 +1,29 @@
+# FRONTEND
+node_modules/
+dist/
+dist-ssr/
+
+# BACKEND
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# ENV
+.env
+.env.*
+
+# DATABASE / STORAGE
+*.db
+storage/
+uploads/
+
+# LOGS
+logs/
+*.log
+
+# OS / EDITOR
+.vscode/
+.idea/
+.DS_Store
