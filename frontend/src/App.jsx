@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import axios from "axios";
 import "./App.css";
 
-const API_URL = "http://127.0.0.1:8001";
+const API_URL = "https://aurevix-speaker-ai.onrender.com";
 
 function App() {
   const [view, setView] = useState("home");
@@ -621,11 +621,11 @@ function PresentationMode({ dashboard, slides, setView }) {
           onClick={() => setView("dashboard")}
         >
           <button
-  className="secondary-btn small"
-  onClick={toggleFullscreen}
->
-  Fullscreen
-</button>
+             className="secondary-btn small"
+             onClick={toggleFullscreen}
+          >
+            Fullscreen
+          </button>
 
           Back to dashboard
         </button>

@@ -79,7 +79,7 @@ def get_thumbnail_url(slide_id: int):
     path = get_thumbnail_path(slide_id)
 
     if os.path.exists(path):
-        return f"http://127.0.0.1:8001/{path}"
+        return f"https://aurevix-speaker-ai.onrender.com/ {path}"
 
     return None
 
@@ -252,7 +252,7 @@ def generate_lecture_qrcode(lecture_id: int):
     if not lecture:
         raise HTTPException(status_code=404, detail="Lecture not found")
 
-    public_url = f"http://127.0.0.1:8001/audience/{lecture_id}"
+    public_url = f"https://aurevix-speaker-ai.onrender.com/audience/{lecture_id}"
     qr_image = qrcode.make(public_url)
 
     file_path = f"storage/qrcodes/lecture_{lecture_id}.png"
@@ -475,8 +475,8 @@ def dashboard_data(lecture_id: int):
         "ai_analysis": analysis,
         "speaker_response": speaker_response,
         "main_theme": main_theme,
-        "audience_url": f"http://127.0.0.1:8001/audience/{lecture_id}",
-        "qrcode_url": f"http://127.0.0.1:8001/lectures/{lecture_id}/qrcode"
+        "audience_url": f"https://aurevix-speaker-ai.onrender.com/audience/{lecture_id}",
+        "qrcode_url": f"https://aurevix-speaker-ai.onrender.com/lectures/{lecture_id}/qrcode"
     }
 
 
