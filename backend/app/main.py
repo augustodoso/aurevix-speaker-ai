@@ -835,6 +835,42 @@ def rag_answer(
 def get_logo():
     return FileResponse("storage/aurevix-logo.png")
 
+@app.delete("/lectures/{lecture_id}")
+def delete_lecture(lecture_id: int):
+    db = SessionLocal()
+
+    lecture = db.query(Lecture).filter(
+        Lecture.id == lecture_id
+    ).first()
+
+    if not lecture:
+        db.close()
+        raise HTTPException(
+            status_code=404,
+            detail="Lecture not found"
+        )
+
+    db.query(SlideChunk).filter(
+        SlideChunk.lecture_id == lecture_id
+    ).delete()
+
+    db.query(Slide).filter(
+        Slide.lecture_id == lecture_id
+    ).delete()
+
+    db.query(Question).filter(
+        Question.lecture_id == lecture_id
+    ).delete()
+
+    db.delete(lecture)
+    db.commit()
+    db.close()
+
+    return {
+        "message": "Lecture deleted successfully",
+        "lecture_id": lecture_id
+    }
+
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
