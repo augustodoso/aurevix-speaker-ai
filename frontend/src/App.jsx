@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
 import "./App.css";
+import aurevixLogo from "./assets/aurevix-logo.png";
 
 const API_URL = "https://aurevix-speaker-ai.onrender.com";
 
