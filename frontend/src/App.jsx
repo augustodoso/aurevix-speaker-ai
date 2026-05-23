@@ -346,6 +346,29 @@ function Home({ lectures, slidesByLecture, openDashboard, setView }) {
                       className="primary-btn"
                       onClick={() => openDashboard(lecture.id)}
                     >
+                      <button
+                        className="secondary-btn"
+                        onClick={async () => {
+                        const confirmDelete = window.confirm(
+                        "Delete this lecture?"
+                        );
+
+                        if (!confirmDelete) return;
+
+                        try {
+                        await axios.delete(
+                        `${API_URL}/lectures/${lecture.id}`
+                         );
+
+                           window.location.reload();
+                        } catch (error) {
+                        console.error(error);
+                        alert("Error deleting lecture");
+                        }
+                        }}
+                        >
+                        Delete lecture
+                      </button>
                       Open dashboard
                     </button>
 
