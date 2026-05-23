@@ -33,7 +33,9 @@ function App() {
 
     loadDashboard(selectedLectureId);
 
-    const socket = new WebSocket("ws://127.0.0.1:8001/ws");
+    const socket = new WebSocket(
+  "wss://aurevix-speaker-ai.onrender.com/ws"
+);
 
     socket.onmessage = () => {
       loadDashboard(selectedLectureId);
@@ -616,19 +618,21 @@ function PresentationMode({ dashboard, slides, setView }) {
           <h2>{dashboard.lecture.title}</h2>
         </div>
 
+      <div style={{ display: "flex", gap: "10px" }}>
+        <button
+          className="secondary-btn small"
+          onClick={toggleFullscreen}
+        >
+          Fullscreen
+        </button>
+
         <button
           className="secondary-btn small"
           onClick={() => setView("dashboard")}
         >
-          <button
-             className="secondary-btn small"
-             onClick={toggleFullscreen}
-          >
-            Fullscreen
+            Back to dashboard
           </button>
-
-          Back to dashboard
-        </button>
+      </div>
       </header>
 
       <div className="presentation-stage">
