@@ -1168,3 +1168,16 @@ textarea:focus {
     transform: scale(1);
   }
 }
+
+.logo-fallback {
+  width: 52px;
+  height: 52px;
+  border-radius: 12px;
+  background: #020617;
+  color: #22c55e;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 950;
+  font-size: 26px;
+}
