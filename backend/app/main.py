@@ -79,7 +79,7 @@ def get_thumbnail_url(slide_id: int):
     path = get_thumbnail_path(slide_id)
 
     if os.path.exists(path):
-        return f"https://aurevix-speaker-ai.onrender.com/ {path}"
+        return f"https://aurevix-speaker-ai.onrender.com/{path}"
 
     return None
 
@@ -870,7 +870,6 @@ def delete_lecture(lecture_id: int):
         "message": "Lecture deleted successfully",
         "lecture_id": lecture_id
     }
-
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
