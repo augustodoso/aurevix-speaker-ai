@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
 import "./App.css";
-import aurevixLogo from "./assets/aurevix-logo.png";
 
 const API_URL = "https://aurevix-speaker-ai.onrender.com";
 
@@ -34,9 +33,7 @@ function App() {
 
     loadDashboard(selectedLectureId);
 
-    const socket = new WebSocket(
-  "wss://aurevix-speaker-ai.onrender.com/ws"
-);
+    const socket = new WebSocket("wss://aurevix-speaker-ai.onrender.com/ws");
 
     socket.onmessage = () => {
       loadDashboard(selectedLectureId);
@@ -220,6 +217,7 @@ function App() {
             slidesByLecture={slidesByLecture}
             openDashboard={openDashboard}
             setView={setView}
+            loadLectures={loadLectures}
           />
         )}
       </main>
@@ -276,7 +274,13 @@ function Sidebar({ lectures, selectedLectureId, openDashboard, setView }) {
   );
 }
 
-function Home({ lectures, slidesByLecture, openDashboard, setView }) {
+function Home({
+  lectures,
+  slidesByLecture,
+  openDashboard,
+  setView,
+  loadLectures,
+}) {
   return (
     <div className="page">
       <header className="top-header">
@@ -327,6 +331,7 @@ function Home({ lectures, slidesByLecture, openDashboard, setView }) {
                 <article key={lecture.id} className="presentation-card">
                   <div className="presentation-cover">
                     <div className="cover-top"></div>
+
                     <div className="cover-content">
                       <span>{lecture.topic || "Lecture"}</span>
                       <strong>{lecture.title}</strong>
@@ -342,35 +347,38 @@ function Home({ lectures, slidesByLecture, openDashboard, setView }) {
                       <span>AI ready</span>
                     </div>
 
-                    <button
-                      className="primary-btn"
-                      onClick={() => openDashboard(lecture.id)}
-                    >
+                    <div className="lecture-actions">
                       <button
                         className="secondary-btn"
                         onClick={async () => {
-                        const confirmDelete = window.confirm(
-                        "Delete this lecture?"
-                        );
+                          const confirmDelete = window.confirm(
+                            "Delete this lecture?"
+                          );
 
-                        if (!confirmDelete) return;
+                          if (!confirmDelete) return;
 
-                        try {
-                        await axios.delete(
-                        `${API_URL}/lectures/${lecture.id}`
-                         );
+                          try {
+                            await axios.delete(
+                              `${API_URL}/lectures/${lecture.id}`
+                            );
 
-                           window.location.reload();
-                        } catch (error) {
-                        console.error(error);
-                        alert("Error deleting lecture");
-                        }
+                            await loadLectures();
+                          } catch (error) {
+                            console.error(error);
+                            alert("Error deleting lecture");
+                          }
                         }}
-                        >
+                      >
                         Delete lecture
                       </button>
-                      Open dashboard
-                    </button>
+
+                      <button
+                        className="primary-btn"
+                        onClick={() => openDashboard(lecture.id)}
+                      >
+                        Open dashboard
+                      </button>
+                    </div>
 
                     <div className="link-row">
                       <a
@@ -578,7 +586,15 @@ function Dashboard({
 
           <div className="qr-box">
             <h4>Audience QR Code</h4>
-            <img src={dashboard.qrcode_url} alt="QR Code" />
+
+            <a
+              href={dashboard.qrcode_url}
+              target="_blank"
+              rel="noreferrer"
+              className="primary-btn"
+            >
+              Open QR Code
+            </a>
           </div>
         </aside>
       </div>
@@ -604,12 +620,12 @@ function PresentationMode({ dashboard, slides, setView }) {
   }
 
   function toggleFullscreen() {
-  if (!document.fullscreenElement) {
-    document.documentElement.requestFullscreen();
-  } else {
-    document.exitFullscreen();
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen();
+    } else {
+      document.exitFullscreen();
+    }
   }
-}
 
   useEffect(() => {
     function handleKeyDown(e) {
@@ -638,56 +654,47 @@ function PresentationMode({ dashboard, slides, setView }) {
       <header className="presentation-header">
         <div>
           <p className="eyebrow">Presentation Mode</p>
-
           <h2>{dashboard.lecture.title}</h2>
         </div>
 
-      <div style={{ display: "flex", gap: "10px" }}>
-        <button
-          className="secondary-btn small"
-          onClick={toggleFullscreen}
-        >
-          Fullscreen
-        </button>
+        <div style={{ display: "flex", gap: "10px" }}>
+          <button
+            className="secondary-btn small"
+            onClick={toggleFullscreen}
+          >
+            Fullscreen
+          </button>
 
-        <button
-          className="secondary-btn small"
-          onClick={() => setView("dashboard")}
-        >
+          <button
+            className="secondary-btn small"
+            onClick={() => setView("dashboard")}
+          >
             Back to dashboard
           </button>
-      </div>
+        </div>
       </header>
 
       <div className="presentation-stage">
         <div>
           <section className="big-slide">
             {slide?.thumbnail_url ? (
-              <img
-                src={slide.thumbnail_url}
-                alt={slide.filename}
-              />
+              <img src={slide.thumbnail_url} alt={slide.filename} />
             ) : (
               <div className="slide-placeholder">
                 <h1>{dashboard.lecture.title}</h1>
-
                 <p>{dashboard.lecture.topic}</p>
               </div>
             )}
           </section>
 
           <div className="slide-controls">
-            <button onClick={prevSlide}>
-              ← Previous
-            </button>
+            <button onClick={prevSlide}>← Previous</button>
 
             <span>
               Slide {slides.length === 0 ? 0 : currentSlide + 1} / {slides.length}
             </span>
 
-            <button onClick={nextSlide}>
-              Next →
-            </button>
+            <button onClick={nextSlide}>Next →</button>
           </div>
         </div>
 
@@ -696,17 +703,11 @@ function PresentationMode({ dashboard, slides, setView }) {
             <h3>Live Questions</h3>
 
             {dashboard.recent_questions.length === 0 ? (
-              <p className="muted">
-                No questions yet.
-              </p>
+              <p className="muted">No questions yet.</p>
             ) : (
               dashboard.recent_questions.map((q) => (
-                <div
-                  key={q.id}
-                  className="question-item"
-                >
+                <div key={q.id} className="question-item">
                   <strong>{q.user_name}</strong>
-
                   <p>{q.question}</p>
                 </div>
               ))
@@ -715,20 +716,20 @@ function PresentationMode({ dashboard, slides, setView }) {
 
           <div className="live-card">
             <h3>AI Copilot</h3>
-
-            <p className="ai-text">
-              {dashboard.speaker_response}
-            </p>
+            <p className="ai-text">{dashboard.speaker_response}</p>
           </div>
 
           <div className="live-card">
             <h3>Audience QR</h3>
 
-            <img
-              src={dashboard.qrcode_url}
-              alt="Audience QR"
-              className="presentation-qr"
-            />
+            <a
+              href={dashboard.qrcode_url}
+              target="_blank"
+              rel="noreferrer"
+              className="primary-btn"
+            >
+              Open Audience QR
+            </a>
           </div>
         </aside>
       </div>
