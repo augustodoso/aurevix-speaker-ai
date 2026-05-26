@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Form, WebSocket, UploadFile, File
+from fastapi import FastAPI, HTTPException, Form, WebSocket, UploadFile, File, Depends
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -6,7 +6,7 @@ from fastapi.staticfiles import StaticFiles
 from app.database.database import engine, SessionLocal, Base
 from app.database.models import Lecture, Question, Slide, SlideChunk, User
 from app.schemas import LectureCreate, QuestionCreate, UserCreate, UserLogin
-from app.auth import hash_password, verify_password, create_access_token
+from app.auth import hash_password, verify_password, create_access_token, get_current_user
 
 from app.services.ai_service import (
     analyze_questions,
@@ -87,6 +87,21 @@ def get_thumbnail_url(slide_id: int):
         return f"https://aurevix-speaker-ai.onrender.com/{path}"
 
     return None
+
+
+def get_user_lecture_or_404(db, lecture_id: int, current_user: User):
+    lecture = db.query(Lecture).filter(
+        Lecture.id == lecture_id,
+        Lecture.owner_id == current_user.id,
+    ).first()
+
+    if not lecture:
+        raise HTTPException(
+            status_code=404,
+            detail="Lecture not found",
+        )
+
+    return lecture
 
 
 @app.get("/")
@@ -179,10 +194,14 @@ def login_user(data: UserLogin):
 
 
 @app.post("/lectures")
-def create_lecture(data: LectureCreate):
+def create_lecture(
+    data: LectureCreate,
+    current_user: User = Depends(get_current_user),
+):
     db = SessionLocal()
 
     lecture = Lecture(
+        owner_id=current_user.id,
         title=data.title,
         speaker_name=data.speaker_name,
         description=data.description,
@@ -197,6 +216,7 @@ def create_lecture(data: LectureCreate):
         "message": "Lecture created successfully",
         "lecture": {
             "id": lecture.id,
+            "owner_id": lecture.owner_id,
             "title": lecture.title,
             "speaker_name": lecture.speaker_name,
             "description": lecture.description,
@@ -209,13 +229,19 @@ def create_lecture(data: LectureCreate):
 
 
 @app.get("/lectures")
-def get_lectures():
+def get_lectures(
+    current_user: User = Depends(get_current_user),
+):
     db = SessionLocal()
-    lectures = db.query(Lecture).all()
+
+    lectures = db.query(Lecture).filter(
+        Lecture.owner_id == current_user.id
+    ).all()
 
     result = [
         {
             "id": lecture.id,
+            "owner_id": lecture.owner_id,
             "title": lecture.title,
             "speaker_name": lecture.speaker_name,
             "description": lecture.description,
@@ -267,10 +293,17 @@ def create_question(data: QuestionCreate):
 
 
 @app.get("/questions/{lecture_id}")
-def get_questions(lecture_id: int):
+def get_questions(
+    lecture_id: int,
+    current_user: User = Depends(get_current_user),
+):
     db = SessionLocal()
 
-    questions = db.query(Question).filter(Question.lecture_id == lecture_id).all()
+    get_user_lecture_or_404(db, lecture_id, current_user)
+
+    questions = db.query(Question).filter(
+        Question.lecture_id == lecture_id
+    ).all()
 
     result = {
         "lecture_id": lecture_id,
@@ -291,8 +324,13 @@ def get_questions(lecture_id: int):
 
 
 @app.get("/ai-analysis/{lecture_id}")
-def ai_analysis(lecture_id: int):
+def ai_analysis(
+    lecture_id: int,
+    current_user: User = Depends(get_current_user),
+):
     db = SessionLocal()
+
+    get_user_lecture_or_404(db, lecture_id, current_user)
 
     lecture_questions = db.query(Question).filter(
         Question.lecture_id == lecture_id
@@ -481,14 +519,13 @@ async def submit_audience_question(
 
 
 @app.get("/dashboard/{lecture_id}/data")
-def dashboard_data(lecture_id: int):
+def dashboard_data(
+    lecture_id: int,
+    current_user: User = Depends(get_current_user),
+):
     db = SessionLocal()
 
-    lecture = db.query(Lecture).filter(Lecture.id == lecture_id).first()
-
-    if not lecture:
-        db.close()
-        raise HTTPException(status_code=404, detail="Lecture not found")
+    lecture = get_user_lecture_or_404(db, lecture_id, current_user)
 
     lecture_questions = (
         db.query(Question)
@@ -496,8 +533,6 @@ def dashboard_data(lecture_id: int):
         .order_by(Question.id.asc())
         .all()
     )
-
-    db.close()
 
     analysis = "No analysis available"
     speaker_response = "No suggestions available"
@@ -525,9 +560,10 @@ def dashboard_data(lecture_id: int):
         speaker_response = generate_speaker_response(latest_question["question"])
         main_theme = extract_main_theme(formatted_questions)
 
-    return {
+    result = {
         "lecture": {
             "id": lecture.id,
+            "owner_id": lecture.owner_id,
             "title": lecture.title,
             "speaker_name": lecture.speaker_name,
             "description": lecture.description,
@@ -543,19 +579,19 @@ def dashboard_data(lecture_id: int):
         "qrcode_url": f"https://aurevix-speaker-ai.onrender.com/lectures/{lecture_id}/qrcode",
     }
 
+    db.close()
+    return result
+
 
 @app.post("/lectures/{lecture_id}/upload-slide")
 async def upload_slide(
     lecture_id: int,
     file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
 ):
     db = SessionLocal()
 
-    lecture = db.query(Lecture).filter(Lecture.id == lecture_id).first()
-
-    if not lecture:
-        db.close()
-        raise HTTPException(status_code=404, detail="Lecture not found")
+    get_user_lecture_or_404(db, lecture_id, current_user)
 
     safe_filename = file.filename.replace(" ", "_")
     file_path = f"storage/slides/{safe_filename}"
@@ -614,8 +650,13 @@ async def upload_slide(
 
 
 @app.get("/lectures/{lecture_id}/slides")
-def get_slides(lecture_id: int):
+def get_slides(
+    lecture_id: int,
+    current_user: User = Depends(get_current_user),
+):
     db = SessionLocal()
+
+    get_user_lecture_or_404(db, lecture_id, current_user)
 
     slides = db.query(Slide).filter(Slide.lecture_id == lecture_id).all()
 
@@ -634,15 +675,21 @@ def get_slides(lecture_id: int):
 
 
 @app.get("/slides/{slide_id}/summary")
-def summarize_slide(slide_id: int):
+def summarize_slide(
+    slide_id: int,
+    current_user: User = Depends(get_current_user),
+):
     db = SessionLocal()
 
     slide = db.query(Slide).filter(Slide.id == slide_id).first()
 
-    db.close()
-
     if not slide:
+        db.close()
         raise HTTPException(status_code=404, detail="Slide not found")
+
+    get_user_lecture_or_404(db, slide.lecture_id, current_user)
+
+    db.close()
 
     if not slide.filename.lower().endswith(".pdf"):
         return {
@@ -662,8 +709,19 @@ def summarize_slide(slide_id: int):
 
 
 @app.get("/slides/{slide_id}/chunks")
-def get_slide_chunks(slide_id: int):
+def get_slide_chunks(
+    slide_id: int,
+    current_user: User = Depends(get_current_user),
+):
     db = SessionLocal()
+
+    slide = db.query(Slide).filter(Slide.id == slide_id).first()
+
+    if not slide:
+        db.close()
+        raise HTTPException(status_code=404, detail="Slide not found")
+
+    get_user_lecture_or_404(db, slide.lecture_id, current_user)
 
     chunks = db.query(SlideChunk).filter(SlideChunk.slide_id == slide_id).all()
 
@@ -685,14 +743,11 @@ def get_slide_chunks(slide_id: int):
 def match_question_with_slide(
     lecture_id: int,
     question: str = Form(...),
+    current_user: User = Depends(get_current_user),
 ):
     db = SessionLocal()
 
-    lecture = db.query(Lecture).filter(Lecture.id == lecture_id).first()
-
-    if not lecture:
-        db.close()
-        raise HTTPException(status_code=404, detail="Lecture not found")
+    get_user_lecture_or_404(db, lecture_id, current_user)
 
     slides = db.query(Slide).filter(Slide.lecture_id == lecture_id).all()
 
@@ -725,14 +780,11 @@ def slide_based_answer(
     lecture_id: int,
     question: str = Form(...),
     slide_id: int = Form(...),
+    current_user: User = Depends(get_current_user),
 ):
     db = SessionLocal()
 
-    lecture = db.query(Lecture).filter(Lecture.id == lecture_id).first()
-
-    if not lecture:
-        db.close()
-        raise HTTPException(status_code=404, detail="Lecture not found")
+    get_user_lecture_or_404(db, lecture_id, current_user)
 
     slide = (
         db.query(Slide)
@@ -779,14 +831,11 @@ def slide_based_answer(
 def contextual_answer(
     lecture_id: int,
     question: str = Form(...),
+    current_user: User = Depends(get_current_user),
 ):
     db = SessionLocal()
 
-    lecture = db.query(Lecture).filter(Lecture.id == lecture_id).first()
-
-    if not lecture:
-        db.close()
-        raise HTTPException(status_code=404, detail="Lecture not found")
+    lecture = get_user_lecture_or_404(db, lecture_id, current_user)
 
     slides = db.query(Slide).filter(Slide.lecture_id == lecture_id).all()
     questions = db.query(Question).filter(Question.lecture_id == lecture_id).all()
@@ -824,14 +873,11 @@ def contextual_answer(
 def rag_answer(
     lecture_id: int,
     question: str = Form(...),
+    current_user: User = Depends(get_current_user),
 ):
     db = SessionLocal()
 
-    lecture = db.query(Lecture).filter(Lecture.id == lecture_id).first()
-
-    if not lecture:
-        db.close()
-        raise HTTPException(status_code=404, detail="Lecture not found")
+    get_user_lecture_or_404(db, lecture_id, current_user)
 
     chunks = db.query(SlideChunk).filter(SlideChunk.lecture_id == lecture_id).all()
 
@@ -874,17 +920,13 @@ def get_logo():
 
 
 @app.delete("/lectures/{lecture_id}")
-def delete_lecture(lecture_id: int):
+def delete_lecture(
+    lecture_id: int,
+    current_user: User = Depends(get_current_user),
+):
     db = SessionLocal()
 
-    lecture = db.query(Lecture).filter(Lecture.id == lecture_id).first()
-
-    if not lecture:
-        db.close()
-        raise HTTPException(
-            status_code=404,
-            detail="Lecture not found",
-        )
+    lecture = get_user_lecture_or_404(db, lecture_id, current_user)
 
     db.query(SlideChunk).filter(SlideChunk.lecture_id == lecture_id).delete()
     db.query(Slide).filter(Slide.lecture_id == lecture_id).delete()
