@@ -11,7 +11,7 @@ function App() {
   const [authMode, setAuthMode] = useState("login");
   const [authLoading, setAuthLoading] = useState(false);
 
-  const [view, setView] = useState("home");
+  const [view, setView] = useState("home");  
   const [lectures, setLectures] = useState([]);
   const [selectedLectureId, setSelectedLectureId] = useState(null);
   const [dashboard, setDashboard] = useState(null);
@@ -25,7 +25,16 @@ function App() {
   const [generatedPresentation, setGeneratedPresentation] = useState([]);
   const [generatorLoading, setGeneratorLoading] = useState(false);
   const [savedPresentations, setSavedPresentations] = useState([]);
+  
+  const [toast, setToast] = useState(null);
 
+  function showToast(message, type = "success") {
+  setToast({ message, type });
+
+  setTimeout(() => {
+    setToast(null);
+  }, 3000);
+}
   const [formData, setFormData] = useState({
     title: "",
     speaker_name: "",
@@ -54,11 +63,11 @@ function App() {
 
     const socket = new WebSocket("wss://aurevix-speaker-ai.onrender.com/ws");
 
-    socket.onmessage = () => {
-      loadDashboard(selectedLectureId);
-    };
+socket.onmessage = () => {
+  loadDashboard(selectedLectureId);
+};
 
-    return () => socket.close();
+return () => socket.close();
   }, [selectedLectureId, token]);
 
   function handleLoginSuccess(newToken) {
@@ -391,6 +400,7 @@ function App() {
       )}
 
       <main className={isPresentation ? "workspace presentation-workspace" : "workspace"}>
+      
         {view === "create" && (
           <CreateLecture
             formData={formData}
@@ -450,6 +460,13 @@ function App() {
           />
         )}
       </main>
+
+      {toast && (
+        <div className={`toast ${toast.type}`}>
+          {toast.message}
+        </div>
+    )}
+
     </div>
   );
 }
@@ -841,11 +858,20 @@ function AIPresentationGenerator({
 
         <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
           <button
-            className="primary-btn"
-            onClick={generatePresentation}
-            disabled={generatorLoading}
-          >
-            {generatorLoading ? "Generating..." : "Generate Presentation"}
+          className={`primary-btn ${
+           generatorLoading ? "loading-btn" : ""
+            }`}
+           onClick={generatePresentation}
+           disabled={generatorLoading}
+>
+          {generatorLoading ? (
+           <div className="button-loading">
+           <div className="spinner"></div>
+           <span>Generating...</span>
+          </div>
+  ) : (
+           "Generate Presentation"
+   )}
           </button>
 
           <button
