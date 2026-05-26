@@ -17,7 +17,7 @@ from app.services.ai_service import (
     match_question_to_slide,
     generate_slide_based_response,
     build_lecture_context,
-    generate_contextual_answer
+    generate_contextual_answer,
 )
 
 from app.services.slide_service import extract_pdf_text
@@ -31,14 +31,18 @@ import os
 app = FastAPI(
     title="Aurevix Speaker AI",
     version="1.0.0",
-    description="AI assistant for live talks, audience questions, and speaker support."
+    description="AI assistant for live talks, audience questions, and speaker support.",
 )
 
 Base.metadata.create_all(bind=engine)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "https://aurevix-speaker-ai.vercel.app",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -52,7 +56,7 @@ os.makedirs("storage/thumbnails", exist_ok=True)
 app.mount(
     "/storage",
     StaticFiles(directory="storage"),
-    name="storage"
+    name="storage",
 )
 
 active_connections = []
@@ -89,32 +93,32 @@ def get_thumbnail_url(slide_id: int):
 def home():
     return {
         "message": "Aurevix Speaker AI is running",
-        "version": "1.0.0"
+        "version": "1.0.0",
     }
 
 
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+
 @app.post("/auth/register")
 def register_user(data: UserCreate):
     db = SessionLocal()
 
-    existing_user = db.query(User).filter(
-        User.email == data.email
-    ).first()
+    existing_user = db.query(User).filter(User.email == data.email).first()
 
     if existing_user:
         db.close()
         raise HTTPException(
             status_code=400,
-            detail="Email already registered"
+            detail="Email already registered",
         )
 
     user = User(
         name=data.name,
         email=data.email,
-        hashed_password=hash_password(data.password)
+        hashed_password=hash_password(data.password),
     )
 
     db.add(user)
@@ -127,8 +131,8 @@ def register_user(data: UserCreate):
         "user": {
             "id": user.id,
             "name": user.name,
-            "email": user.email
-        }
+            "email": user.email,
+        },
     }
 
 
@@ -136,33 +140,30 @@ def register_user(data: UserCreate):
 def login_user(data: UserLogin):
     db = SessionLocal()
 
-    user = db.query(User).filter(
-        User.email == data.email
-    ).first()
+    user = db.query(User).filter(User.email == data.email).first()
 
     if not user:
         db.close()
         raise HTTPException(
             status_code=401,
-            detail="Invalid email or password"
+            detail="Invalid email or password",
         )
 
-    password_is_valid = verify_password(
-        data.password,
-        user.hashed_password
-    )
+    password_is_valid = verify_password(data.password, user.hashed_password)
 
     if not password_is_valid:
         db.close()
         raise HTTPException(
             status_code=401,
-            detail="Invalid email or password"
+            detail="Invalid email or password",
         )
 
-    token = create_access_token({
-        "sub": str(user.id),
-        "email": user.email
-    })
+    token = create_access_token(
+        {
+            "sub": str(user.id),
+            "email": user.email,
+        }
+    )
 
     db.close()
 
@@ -172,8 +173,8 @@ def login_user(data: UserLogin):
         "user": {
             "id": user.id,
             "name": user.name,
-            "email": user.email
-        }
+            "email": user.email,
+        },
     }
 
 
@@ -185,7 +186,7 @@ def create_lecture(data: LectureCreate):
         title=data.title,
         speaker_name=data.speaker_name,
         description=data.description,
-        topic=data.topic
+        topic=data.topic,
     )
 
     db.add(lecture)
@@ -199,8 +200,8 @@ def create_lecture(data: LectureCreate):
             "title": lecture.title,
             "speaker_name": lecture.speaker_name,
             "description": lecture.description,
-            "topic": lecture.topic
-        }
+            "topic": lecture.topic,
+        },
     }
 
     db.close()
@@ -218,7 +219,7 @@ def get_lectures():
             "title": lecture.title,
             "speaker_name": lecture.speaker_name,
             "description": lecture.description,
-            "topic": lecture.topic
+            "topic": lecture.topic,
         }
         for lecture in lectures
     ]
@@ -231,9 +232,7 @@ def get_lectures():
 def create_question(data: QuestionCreate):
     db = SessionLocal()
 
-    lecture = db.query(Lecture).filter(
-        Lecture.id == data.lecture_id
-    ).first()
+    lecture = db.query(Lecture).filter(Lecture.id == data.lecture_id).first()
 
     if not lecture:
         db.close()
@@ -245,7 +244,7 @@ def create_question(data: QuestionCreate):
         lecture_id=data.lecture_id,
         user_name=data.user_name,
         question=data.question,
-        priority_score=priority_score
+        priority_score=priority_score,
     )
 
     db.add(question)
@@ -259,8 +258,8 @@ def create_question(data: QuestionCreate):
             "lecture_id": question.lecture_id,
             "user_name": question.user_name,
             "question": question.question,
-            "priority_score": question.priority_score
-        }
+            "priority_score": question.priority_score,
+        },
     }
 
     db.close()
@@ -271,9 +270,7 @@ def create_question(data: QuestionCreate):
 def get_questions(lecture_id: int):
     db = SessionLocal()
 
-    questions = db.query(Question).filter(
-        Question.lecture_id == lecture_id
-    ).all()
+    questions = db.query(Question).filter(Question.lecture_id == lecture_id).all()
 
     result = {
         "lecture_id": lecture_id,
@@ -283,10 +280,10 @@ def get_questions(lecture_id: int):
                 "lecture_id": question.lecture_id,
                 "user_name": question.user_name,
                 "question": question.question,
-                "priority_score": question.priority_score
+                "priority_score": question.priority_score,
             }
             for question in questions
-        ]
+        ],
     }
 
     db.close()
@@ -306,16 +303,13 @@ def ai_analysis(lecture_id: int):
     if not lecture_questions:
         raise HTTPException(status_code=404, detail="No questions found")
 
-    formatted_questions = [
-        {"question": q.question}
-        for q in lecture_questions
-    ]
+    formatted_questions = [{"question": q.question} for q in lecture_questions]
 
     analysis = analyze_questions(formatted_questions)
 
     return {
         "lecture_id": lecture_id,
-        "analysis": analysis
+        "analysis": analysis,
     }
 
 
@@ -323,9 +317,7 @@ def ai_analysis(lecture_id: int):
 def generate_lecture_qrcode(lecture_id: int):
     db = SessionLocal()
 
-    lecture = db.query(Lecture).filter(
-        Lecture.id == lecture_id
-    ).first()
+    lecture = db.query(Lecture).filter(Lecture.id == lecture_id).first()
 
     db.close()
 
@@ -341,7 +333,7 @@ def generate_lecture_qrcode(lecture_id: int):
     return FileResponse(
         file_path,
         media_type="image/png",
-        filename=f"lecture_{lecture_id}_qrcode.png"
+        filename=f"lecture_{lecture_id}_qrcode.png",
     )
 
 
@@ -349,9 +341,7 @@ def generate_lecture_qrcode(lecture_id: int):
 def audience_page(lecture_id: int):
     db = SessionLocal()
 
-    lecture = db.query(Lecture).filter(
-        Lecture.id == lecture_id
-    ).first()
+    lecture = db.query(Lecture).filter(Lecture.id == lecture_id).first()
 
     db.close()
 
@@ -439,13 +429,11 @@ def audience_page(lecture_id: int):
 async def submit_audience_question(
     lecture_id: int,
     user_name: str = Form(...),
-    question: str = Form(...)
+    question: str = Form(...),
 ):
     db = SessionLocal()
 
-    lecture = db.query(Lecture).filter(
-        Lecture.id == lecture_id
-    ).first()
+    lecture = db.query(Lecture).filter(Lecture.id == lecture_id).first()
 
     if not lecture:
         db.close()
@@ -457,7 +445,7 @@ async def submit_audience_question(
         lecture_id=lecture_id,
         user_name=user_name,
         question=question,
-        priority_score=priority_score
+        priority_score=priority_score,
     )
 
     db.add(new_question)
@@ -496,17 +484,18 @@ async def submit_audience_question(
 def dashboard_data(lecture_id: int):
     db = SessionLocal()
 
-    lecture = db.query(Lecture).filter(
-        Lecture.id == lecture_id
-    ).first()
+    lecture = db.query(Lecture).filter(Lecture.id == lecture_id).first()
 
     if not lecture:
         db.close()
         raise HTTPException(status_code=404, detail="Lecture not found")
 
-    lecture_questions = db.query(Question).filter(
-        Question.lecture_id == lecture_id
-    ).order_by(Question.id.asc()).all()
+    lecture_questions = (
+        db.query(Question)
+        .filter(Question.lecture_id == lecture_id)
+        .order_by(Question.id.asc())
+        .all()
+    )
 
     db.close()
 
@@ -519,7 +508,7 @@ def dashboard_data(lecture_id: int):
             "id": q.id,
             "user_name": q.user_name,
             "question": q.question,
-            "priority_score": q.priority_score
+            "priority_score": q.priority_score,
         }
         for q in lecture_questions
     ]
@@ -527,18 +516,13 @@ def dashboard_data(lecture_id: int):
     priority_questions = sorted(
         formatted_questions,
         key=lambda q: q["priority_score"],
-        reverse=True
+        reverse=True,
     )[:5]
 
     if formatted_questions:
         analysis = analyze_questions(formatted_questions)
-
         latest_question = formatted_questions[-1]
-
-        speaker_response = generate_speaker_response(
-            latest_question["question"]
-        )
-
+        speaker_response = generate_speaker_response(latest_question["question"])
         main_theme = extract_main_theme(formatted_questions)
 
     return {
@@ -547,7 +531,7 @@ def dashboard_data(lecture_id: int):
             "title": lecture.title,
             "speaker_name": lecture.speaker_name,
             "description": lecture.description,
-            "topic": lecture.topic
+            "topic": lecture.topic,
         },
         "total_questions": len(formatted_questions),
         "recent_questions": formatted_questions[-5:],
@@ -556,20 +540,18 @@ def dashboard_data(lecture_id: int):
         "speaker_response": speaker_response,
         "main_theme": main_theme,
         "audience_url": f"https://aurevix-speaker-ai.onrender.com/audience/{lecture_id}",
-        "qrcode_url": f"https://aurevix-speaker-ai.onrender.com/lectures/{lecture_id}/qrcode"
+        "qrcode_url": f"https://aurevix-speaker-ai.onrender.com/lectures/{lecture_id}/qrcode",
     }
 
 
 @app.post("/lectures/{lecture_id}/upload-slide")
 async def upload_slide(
     lecture_id: int,
-    file: UploadFile = File(...)
+    file: UploadFile = File(...),
 ):
     db = SessionLocal()
 
-    lecture = db.query(Lecture).filter(
-        Lecture.id == lecture_id
-    ).first()
+    lecture = db.query(Lecture).filter(Lecture.id == lecture_id).first()
 
     if not lecture:
         db.close()
@@ -584,7 +566,7 @@ async def upload_slide(
     slide = Slide(
         lecture_id=lecture_id,
         filename=safe_filename,
-        filepath=file_path
+        filepath=file_path,
     )
 
     db.add(slide)
@@ -598,7 +580,7 @@ async def upload_slide(
 
         generate_pdf_thumbnail(
             pdf_path=file_path,
-            output_path=thumbnail_path
+            output_path=thumbnail_path,
         )
 
         thumbnail_url = get_thumbnail_url(slide.id)
@@ -610,7 +592,7 @@ async def upload_slide(
             slide_chunk = SlideChunk(
                 slide_id=slide.id,
                 lecture_id=lecture_id,
-                content=chunk
+                content=chunk,
             )
 
             db.add(slide_chunk)
@@ -623,8 +605,8 @@ async def upload_slide(
             "id": slide.id,
             "filename": slide.filename,
             "filepath": slide.filepath,
-            "thumbnail_url": thumbnail_url
-        }
+            "thumbnail_url": thumbnail_url,
+        },
     }
 
     db.close()
@@ -635,16 +617,14 @@ async def upload_slide(
 def get_slides(lecture_id: int):
     db = SessionLocal()
 
-    slides = db.query(Slide).filter(
-        Slide.lecture_id == lecture_id
-    ).all()
+    slides = db.query(Slide).filter(Slide.lecture_id == lecture_id).all()
 
     result = [
         {
             "id": slide.id,
             "filename": slide.filename,
             "filepath": slide.filepath,
-            "thumbnail_url": get_thumbnail_url(slide.id)
+            "thumbnail_url": get_thumbnail_url(slide.id),
         }
         for slide in slides
     ]
@@ -657,9 +637,7 @@ def get_slides(lecture_id: int):
 def summarize_slide(slide_id: int):
     db = SessionLocal()
 
-    slide = db.query(Slide).filter(
-        Slide.id == slide_id
-    ).first()
+    slide = db.query(Slide).filter(Slide.id == slide_id).first()
 
     db.close()
 
@@ -670,7 +648,7 @@ def summarize_slide(slide_id: int):
         return {
             "slide_id": slide.id,
             "filename": slide.filename,
-            "summary": "Summary is currently available only for PDF files."
+            "summary": "Summary is currently available only for PDF files.",
         }
 
     text = extract_pdf_text(slide.filepath)
@@ -679,7 +657,7 @@ def summarize_slide(slide_id: int):
     return {
         "slide_id": slide.id,
         "filename": slide.filename,
-        "summary": summary
+        "summary": summary,
     }
 
 
@@ -687,16 +665,14 @@ def summarize_slide(slide_id: int):
 def get_slide_chunks(slide_id: int):
     db = SessionLocal()
 
-    chunks = db.query(SlideChunk).filter(
-        SlideChunk.slide_id == slide_id
-    ).all()
+    chunks = db.query(SlideChunk).filter(SlideChunk.slide_id == slide_id).all()
 
     result = [
         {
             "id": chunk.id,
             "slide_id": chunk.slide_id,
             "lecture_id": chunk.lecture_id,
-            "content": chunk.content
+            "content": chunk.content,
         }
         for chunk in chunks
     ]
@@ -708,28 +684,24 @@ def get_slide_chunks(slide_id: int):
 @app.post("/lectures/{lecture_id}/match-question")
 def match_question_with_slide(
     lecture_id: int,
-    question: str = Form(...)
+    question: str = Form(...),
 ):
     db = SessionLocal()
 
-    lecture = db.query(Lecture).filter(
-        Lecture.id == lecture_id
-    ).first()
+    lecture = db.query(Lecture).filter(Lecture.id == lecture_id).first()
 
     if not lecture:
         db.close()
         raise HTTPException(status_code=404, detail="Lecture not found")
 
-    slides = db.query(Slide).filter(
-        Slide.lecture_id == lecture_id
-    ).all()
+    slides = db.query(Slide).filter(Slide.lecture_id == lecture_id).all()
 
     formatted_slides = [
         {
             "id": slide.id,
             "filename": slide.filename,
             "filepath": slide.filepath,
-            "thumbnail_url": get_thumbnail_url(slide.id)
+            "thumbnail_url": get_thumbnail_url(slide.id),
         }
         for slide in slides
     ]
@@ -738,13 +710,13 @@ def match_question_with_slide(
 
     match_result = match_question_to_slide(
         question,
-        formatted_slides
+        formatted_slides,
     )
 
     return {
         "lecture_id": lecture_id,
         "question": question,
-        "match": match_result
+        "match": match_result,
     }
 
 
@@ -752,29 +724,31 @@ def match_question_with_slide(
 def slide_based_answer(
     lecture_id: int,
     question: str = Form(...),
-    slide_id: int = Form(...)
+    slide_id: int = Form(...),
 ):
     db = SessionLocal()
 
-    lecture = db.query(Lecture).filter(
-        Lecture.id == lecture_id
-    ).first()
+    lecture = db.query(Lecture).filter(Lecture.id == lecture_id).first()
 
     if not lecture:
         db.close()
         raise HTTPException(status_code=404, detail="Lecture not found")
 
-    slide = db.query(Slide).filter(
-        Slide.id == slide_id,
-        Slide.lecture_id == lecture_id
-    ).first()
+    slide = (
+        db.query(Slide)
+        .filter(
+            Slide.id == slide_id,
+            Slide.lecture_id == lecture_id,
+        )
+        .first()
+    )
 
     db.close()
 
     if not slide:
         raise HTTPException(
             status_code=404,
-            detail="Slide not found for this lecture"
+            detail="Slide not found for this lecture",
         )
 
     if not slide.filename.lower().endswith(".pdf"):
@@ -782,14 +756,14 @@ def slide_based_answer(
             "lecture_id": lecture_id,
             "slide_id": slide_id,
             "question": question,
-            "answer": "Slide-based answers are currently available only for PDF files."
+            "answer": "Slide-based answers are currently available only for PDF files.",
         }
 
     slide_text = extract_pdf_text(slide.filepath)
 
     answer = generate_slide_based_response(
         question,
-        slide_text
+        slide_text,
     )
 
     return {
@@ -797,32 +771,25 @@ def slide_based_answer(
         "slide_id": slide_id,
         "filename": slide.filename,
         "question": question,
-        "answer": answer
+        "answer": answer,
     }
 
 
 @app.post("/lectures/{lecture_id}/contextual-answer")
 def contextual_answer(
     lecture_id: int,
-    question: str = Form(...)
+    question: str = Form(...),
 ):
     db = SessionLocal()
 
-    lecture = db.query(Lecture).filter(
-        Lecture.id == lecture_id
-    ).first()
+    lecture = db.query(Lecture).filter(Lecture.id == lecture_id).first()
 
     if not lecture:
         db.close()
         raise HTTPException(status_code=404, detail="Lecture not found")
 
-    slides = db.query(Slide).filter(
-        Slide.lecture_id == lecture_id
-    ).all()
-
-    questions = db.query(Question).filter(
-        Question.lecture_id == lecture_id
-    ).all()
+    slides = db.query(Slide).filter(Slide.lecture_id == lecture_id).all()
+    questions = db.query(Question).filter(Question.lecture_id == lecture_id).all()
 
     db.close()
 
@@ -830,62 +797,52 @@ def contextual_answer(
 
     for slide in slides:
         if slide.filename.lower().endswith(".pdf"):
-            slide_texts.append(
-                extract_pdf_text(slide.filepath)
-            )
+            slide_texts.append(extract_pdf_text(slide.filepath))
 
-    previous_questions = [
-        q.question for q in questions
-    ]
+    previous_questions = [q.question for q in questions]
 
     lecture_context = build_lecture_context(
         lecture_title=lecture.title,
         lecture_topic=lecture.topic,
         slide_texts=slide_texts,
-        previous_questions=previous_questions
+        previous_questions=previous_questions,
     )
 
     answer = generate_contextual_answer(
         question=question,
-        lecture_context=lecture_context
+        lecture_context=lecture_context,
     )
 
     return {
         "lecture_id": lecture_id,
         "question": question,
-        "answer": answer
+        "answer": answer,
     }
 
 
 @app.post("/lectures/{lecture_id}/rag-answer")
 def rag_answer(
     lecture_id: int,
-    question: str = Form(...)
+    question: str = Form(...),
 ):
     db = SessionLocal()
 
-    lecture = db.query(Lecture).filter(
-        Lecture.id == lecture_id
-    ).first()
+    lecture = db.query(Lecture).filter(Lecture.id == lecture_id).first()
 
     if not lecture:
         db.close()
         raise HTTPException(status_code=404, detail="Lecture not found")
 
-    chunks = db.query(SlideChunk).filter(
-        SlideChunk.lecture_id == lecture_id
-    ).all()
+    chunks = db.query(SlideChunk).filter(SlideChunk.lecture_id == lecture_id).all()
 
     db.close()
 
-    chunk_contents = [
-        chunk.content for chunk in chunks
-    ]
+    chunk_contents = [chunk.content for chunk in chunks]
 
     relevant_chunks = find_relevant_chunks(
         question=question,
         chunks=chunk_contents,
-        limit=3
+        limit=3,
     )
 
     if not relevant_chunks:
@@ -893,21 +850,21 @@ def rag_answer(
             "lecture_id": lecture_id,
             "question": question,
             "answer": "No relevant slide content found for this question.",
-            "relevant_chunks": []
+            "relevant_chunks": [],
         }
 
     context = "\n\n".join(relevant_chunks)
 
     answer = generate_slide_based_response(
         question=question,
-        slide_text=context
+        slide_text=context,
     )
 
     return {
         "lecture_id": lecture_id,
         "question": question,
         "answer": answer,
-        "relevant_chunks": relevant_chunks
+        "relevant_chunks": relevant_chunks,
     }
 
 
@@ -915,32 +872,23 @@ def rag_answer(
 def get_logo():
     return FileResponse("storage/aurevix-logo.png")
 
+
 @app.delete("/lectures/{lecture_id}")
 def delete_lecture(lecture_id: int):
     db = SessionLocal()
 
-    lecture = db.query(Lecture).filter(
-        Lecture.id == lecture_id
-    ).first()
+    lecture = db.query(Lecture).filter(Lecture.id == lecture_id).first()
 
     if not lecture:
         db.close()
         raise HTTPException(
             status_code=404,
-            detail="Lecture not found"
+            detail="Lecture not found",
         )
 
-    db.query(SlideChunk).filter(
-        SlideChunk.lecture_id == lecture_id
-    ).delete()
-
-    db.query(Slide).filter(
-        Slide.lecture_id == lecture_id
-    ).delete()
-
-    db.query(Question).filter(
-        Question.lecture_id == lecture_id
-    ).delete()
+    db.query(SlideChunk).filter(SlideChunk.lecture_id == lecture_id).delete()
+    db.query(Slide).filter(Slide.lecture_id == lecture_id).delete()
+    db.query(Question).filter(Question.lecture_id == lecture_id).delete()
 
     db.delete(lecture)
     db.commit()
@@ -948,8 +896,9 @@ def delete_lecture(lecture_id: int):
 
     return {
         "message": "Lecture deleted successfully",
-        "lecture_id": lecture_id
+        "lecture_id": lecture_id,
     }
+
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
