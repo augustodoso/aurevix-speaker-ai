@@ -1218,3 +1218,74 @@ textarea:focus {
 .auth-card input {
   width: 100%;
 }
+
+.user-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.user-footer div {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.logout-btn {
+  border: none;
+  background: rgba(255, 255, 255, 0.08);
+  color: inherit;
+  padding: 10px 12px;
+  border-radius: 12px;
+  cursor: pointer;
+}
+
+.generated-slides {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.generated-slide-card {
+  background: white;
+  border-radius: 24px;
+  padding: 32px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.06);
+}
+
+.generated-slide-top {
+  margin-bottom: 12px;
+  color: #64748b;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.generated-slide-card h3 {
+  font-size: 28px;
+  margin-bottom: 20px;
+}
+
+.generated-slide-card ul {
+  padding-left: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.generated-slide-card li {
+  font-size: 18px;
+  line-height: 1.6;
+}
+
+.speaker-notes {
+  margin-top: 24px;
+  padding: 20px;
+  background: #f8fafc;
+  border-radius: 16px;
+}
+
+.speaker-notes p {
+  margin-top: 10px;
+  color: #475569;
+  line-height: 1.7;
+}

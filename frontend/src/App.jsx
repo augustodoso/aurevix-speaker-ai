@@ -7,6 +7,7 @@ const TOKEN_KEY = "aurevix_speaker_token";
 
 function App() {
   const [token, setToken] = useState(localStorage.getItem(TOKEN_KEY));
+  const [user, setUser] = useState(null);
   const [authMode, setAuthMode] = useState("login");
   const [authLoading, setAuthLoading] = useState(false);
 
@@ -19,6 +20,11 @@ function App() {
   const [aiQuestion, setAiQuestion] = useState("");
   const [aiAnswer, setAiAnswer] = useState("");
   const [aiLoading, setAiLoading] = useState(false);
+
+  const [generatorTopic, setGeneratorTopic] = useState("");
+  const [generatedPresentation, setGeneratedPresentation] = useState([]);
+  const [generatorLoading, setGeneratorLoading] = useState(false);
+  const [savedPresentations, setSavedPresentations] = useState([]);
 
   const [formData, setFormData] = useState({
     title: "",
@@ -35,7 +41,9 @@ function App() {
 
   useEffect(() => {
     if (token) {
+      loadCurrentUser();
       loadLectures();
+      loadGeneratedPresentations();
     }
   }, [token]);
 
@@ -62,11 +70,28 @@ function App() {
   function logout() {
     localStorage.removeItem(TOKEN_KEY);
     setToken(null);
+    setUser(null);
     setLectures([]);
     setSelectedLectureId(null);
     setDashboard(null);
     setSlidesByLecture({});
+    setSlideSummaries({});
+    setAiQuestion("");
+    setAiAnswer("");
+    setGeneratorTopic("");
+    setGeneratedPresentation([]);
+    setSavedPresentations([]);
     setView("home");
+  }
+
+  async function loadCurrentUser() {
+    try {
+      const response = await axios.get(`${API_URL}/auth/me`, authHeaders);
+      setUser(response.data);
+    } catch (error) {
+      console.error(error);
+      logout();
+    }
   }
 
   async function handleAuthSubmit(e, authData) {
@@ -122,7 +147,7 @@ function App() {
     } catch (error) {
       console.error(error);
 
-      if (error.response?.status === 401) {
+      if (error.response?.status === 401 || error.response?.status === 403) {
         logout();
       }
     }
@@ -150,10 +175,16 @@ function App() {
         `${API_URL}/dashboard/${id}/data`,
         authHeaders
       );
+
       setDashboard(response.data);
       await loadSlides(id);
     } catch (error) {
       console.error(error);
+
+      if (error.response?.status === 404) {
+        alert("Lecture not found or you do not have access.");
+        setView("home");
+      }
     }
   }
 
@@ -190,6 +221,7 @@ function App() {
         form,
         authHeaders
       );
+
       await loadSlides(id);
       alert("Slide uploaded!");
     } catch (error) {
@@ -238,6 +270,87 @@ function App() {
     }
   }
 
+  async function generatePresentation() {
+    if (!generatorTopic.trim()) {
+      alert("Please enter a presentation topic.");
+      return;
+    }
+
+    const form = new FormData();
+    form.append("topic", generatorTopic);
+
+    try {
+      setGeneratorLoading(true);
+      setGeneratedPresentation([]);
+
+      const response = await axios.post(
+        `${API_URL}/ai/generate-presentation`,
+        form,
+        authHeaders
+      );
+
+      setGeneratedPresentation(response.data.slides || []);
+    } catch (error) {
+      console.error(error);
+      alert("Error generating presentation");
+    } finally {
+      setGeneratorLoading(false);
+    }
+  }
+
+  async function savePresentation() {
+    if (!generatorTopic.trim() || generatedPresentation.length === 0) {
+      alert("Generate a presentation before saving.");
+      return;
+    }
+
+    const form = new FormData();
+    form.append("topic", generatorTopic);
+    form.append("slides_json", JSON.stringify(generatedPresentation));
+
+    try {
+      await axios.post(`${API_URL}/ai/save-presentation`, form, authHeaders);
+      await loadGeneratedPresentations();
+      alert("Presentation saved!");
+    } catch (error) {
+      console.error(error);
+      alert("Error saving presentation");
+    }
+  }
+
+  async function loadGeneratedPresentations() {
+    try {
+      const response = await axios.get(
+        `${API_URL}/ai/generated-presentations`,
+        authHeaders
+      );
+
+      setSavedPresentations(response.data || []);
+    } catch (error) {
+      console.error(error);
+    }
+  }
+
+  async function deleteGeneratedPresentation(id) {
+    try {
+      await axios.delete(
+        `${API_URL}/ai/generated-presentations/${id}`,
+        authHeaders
+      );
+
+      await loadGeneratedPresentations();
+    } catch (error) {
+      console.error(error);
+      alert("Error deleting saved presentation");
+    }
+  }
+
+  function openSavedPresentation(presentation) {
+    setGeneratorTopic(presentation.topic);
+    setGeneratedPresentation(presentation.slides || []);
+    setView("generator");
+  }
+
   function openDashboard(id) {
     setSelectedLectureId(id);
     setDashboard(null);
@@ -273,6 +386,7 @@ function App() {
           openDashboard={openDashboard}
           setView={setView}
           logout={logout}
+          user={user}
         />
       )}
 
@@ -282,6 +396,20 @@ function App() {
             formData={formData}
             handleChange={handleChange}
             createLecture={createLecture}
+          />
+        )}
+
+        {view === "generator" && (
+          <AIPresentationGenerator
+            generatorTopic={generatorTopic}
+            setGeneratorTopic={setGeneratorTopic}
+            generatedPresentation={generatedPresentation}
+            generatorLoading={generatorLoading}
+            generatePresentation={generatePresentation}
+            savePresentation={savePresentation}
+            savedPresentations={savedPresentations}
+            openSavedPresentation={openSavedPresentation}
+            deleteGeneratedPresentation={deleteGeneratedPresentation}
           />
         )}
 
@@ -365,6 +493,7 @@ function AuthScreen({ authMode, setAuthMode, authLoading, handleAuthSubmit }) {
               placeholder="Name"
               value={authData.name}
               onChange={handleAuthChange}
+              required
             />
           )}
 
@@ -410,7 +539,14 @@ function AuthScreen({ authMode, setAuthMode, authLoading, handleAuthSubmit }) {
   );
 }
 
-function Sidebar({ lectures, selectedLectureId, openDashboard, setView, logout }) {
+function Sidebar({
+  lectures,
+  selectedLectureId,
+  openDashboard,
+  setView,
+  logout,
+  user,
+}) {
   return (
     <aside className="sidebar">
       <div>
@@ -425,7 +561,7 @@ function Sidebar({ lectures, selectedLectureId, openDashboard, setView, logout }
         <nav className="nav">
           <button onClick={() => setView("home")}>Home</button>
           <button onClick={() => setView("create")}>New lecture</button>
-          <button onClick={logout}>Logout</button>
+          <button onClick={() => setView("generator")}>AI Generator</button>
         </nav>
 
         <div className="sidebar-section">
@@ -452,15 +588,28 @@ function Sidebar({ lectures, selectedLectureId, openDashboard, setView, logout }
         </div>
       </div>
 
-      <div className="sidebar-footer">
-        <span className="status-dot"></span>
-        Online server running
+      <div className="sidebar-footer user-footer">
+        <div>
+          <span className="status-dot"></span>
+          <span>{user ? `Logged as ${user.name}` : "Online"}</span>
+        </div>
+
+        <button className="logout-btn" onClick={logout}>
+          Logout
+        </button>
       </div>
     </aside>
   );
 }
 
-function Home({ lectures, slidesByLecture, openDashboard, setView, loadLectures, token }) {
+function Home({
+  lectures,
+  slidesByLecture,
+  openDashboard,
+  setView,
+  loadLectures,
+  token,
+}) {
   const authHeaders = token
     ? { headers: { Authorization: `Bearer ${token}` } }
     : {};
@@ -542,14 +691,6 @@ function Home({ lectures, slidesByLecture, openDashboard, setView, loadLectures,
                           if (!confirmDelete) return;
 
                           try {
-                            const authHeaders = token
-                              ? {
-                                  headers: {
-                                    Authorization: `Bearer ${token}`,
-                                  },
-                                }
-                              : {};
-
                             await axios.delete(
                               `${API_URL}/lectures/${lecture.id}`,
                               authHeaders
@@ -597,6 +738,176 @@ function Home({ lectures, slidesByLecture, openDashboard, setView, loadLectures,
           </div>
         )}
       </section>
+    </div>
+  );
+}
+
+function AIPresentationGenerator({
+  generatorTopic,
+  setGeneratorTopic,
+  generatedPresentation,
+  generatorLoading,
+  generatePresentation,
+  savePresentation,
+  savedPresentations,
+  openSavedPresentation,
+  deleteGeneratedPresentation,
+}) {
+  async function exportPresentation() {
+    if (!generatorTopic.trim()) {
+      alert("Please enter a presentation topic first.");
+      return;
+    }
+
+    const form = new FormData();
+    form.append("topic", generatorTopic);
+
+    try {
+      const response = await axios.post(`${API_URL}/ai/export-pptx`, form, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem(TOKEN_KEY)}`,
+        },
+        responseType: "blob",
+      });
+
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement("a");
+
+      link.href = url;
+      link.setAttribute("download", `${generatorTopic}.pptx`);
+
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error(error);
+      alert("Error exporting PowerPoint");
+    }
+  }
+
+  return (
+    <div className="page">
+      <header className="top-header">
+        <div>
+          <p className="eyebrow">Aurevix AI</p>
+          <h2>AI Presentation Generator</h2>
+          <p>Create a complete presentation structure from a simple topic.</p>
+        </div>
+      </header>
+
+      <section className="panel generator-panel">
+        <h3>Generate a presentation</h3>
+        <p className="muted">
+          Enter a topic and Aurevix will generate slides, bullet points,
+          speaker notes and possible audience questions.
+        </p>
+
+        <textarea
+          rows="5"
+          placeholder="Example: Artificial Intelligence in Healthcare"
+          value={generatorTopic}
+          onChange={(e) => setGeneratorTopic(e.target.value)}
+        />
+
+        <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
+          <button
+            className="primary-btn"
+            onClick={generatePresentation}
+            disabled={generatorLoading}
+          >
+            {generatorLoading ? "Generating..." : "Generate Presentation"}
+          </button>
+
+          <button
+            className="secondary-btn"
+            onClick={exportPresentation}
+            disabled={generatorLoading}
+          >
+            Export PPTX
+          </button>
+
+          <button
+            className="secondary-btn"
+            onClick={savePresentation}
+            disabled={generatorLoading || generatedPresentation.length === 0}
+          >
+            Save Presentation
+          </button>
+        </div>
+      </section>
+
+      {savedPresentations.length > 0 && (
+        <section className="panel">
+          <div className="section-header">
+            <h3>My AI Presentations</h3>
+            <p>{savedPresentations.length} saved presentations.</p>
+          </div>
+
+          <div className="generated-slides">
+            {savedPresentations.map((item) => (
+              <div key={item.id} className="generated-slide-card">
+                <div className="generated-slide-top">
+                  <span>Saved Presentation</span>
+                </div>
+
+                <h3>{item.topic}</h3>
+
+                <p className="muted">{item.slides?.length || 0} slides saved.</p>
+
+                <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
+                  <button
+                    className="primary-btn"
+                    onClick={() => openSavedPresentation(item)}
+                  >
+                    Open
+                  </button>
+
+                  <button
+                    className="secondary-btn"
+                    onClick={() => deleteGeneratedPresentation(item.id)}
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {generatedPresentation.length > 0 && (
+        <section className="panel">
+          <div className="section-header">
+            <h3>Generated slides</h3>
+            <p>{generatedPresentation.length} slides created by AI.</p>
+          </div>
+
+          <div className="generated-slides">
+            {generatedPresentation.map((slide, index) => (
+              <div key={index} className="generated-slide-card">
+                <div className="generated-slide-top">
+                  <span>Slide {index + 1}</span>
+                </div>
+
+                <h3>{slide.title}</h3>
+
+                <ul>
+                  {slide.content?.map((item, idx) => (
+                    <li key={idx}>{item}</li>
+                  ))}
+                </ul>
+
+                <div className="speaker-notes">
+                  <strong>Speaker Notes</strong>
+                  <p>{slide.speaker_notes}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   );
 }
