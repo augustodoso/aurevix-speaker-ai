@@ -3,8 +3,13 @@ import axios from "axios";
 import "./App.css";
 
 const API_URL = "https://aurevix-speaker-ai.onrender.com";
+const TOKEN_KEY = "aurevix_speaker_token";
 
 function App() {
+  const [token, setToken] = useState(localStorage.getItem(TOKEN_KEY));
+  const [authMode, setAuthMode] = useState("login");
+  const [authLoading, setAuthLoading] = useState(false);
+
   const [view, setView] = useState("home");
   const [lectures, setLectures] = useState([]);
   const [selectedLectureId, setSelectedLectureId] = useState(null);
@@ -24,12 +29,18 @@ function App() {
 
   const isPresentation = view === "presentation";
 
-  useEffect(() => {
-    loadLectures();
-  }, []);
+  const authHeaders = token
+    ? { headers: { Authorization: `Bearer ${token}` } }
+    : {};
 
   useEffect(() => {
-    if (!selectedLectureId) return;
+    if (token) {
+      loadLectures();
+    }
+  }, [token]);
+
+  useEffect(() => {
+    if (!selectedLectureId || !token) return;
 
     loadDashboard(selectedLectureId);
 
@@ -40,11 +51,69 @@ function App() {
     };
 
     return () => socket.close();
-  }, [selectedLectureId]);
+  }, [selectedLectureId, token]);
+
+  function handleLoginSuccess(newToken) {
+    localStorage.setItem(TOKEN_KEY, newToken);
+    setToken(newToken);
+    setView("home");
+  }
+
+  function logout() {
+    localStorage.removeItem(TOKEN_KEY);
+    setToken(null);
+    setLectures([]);
+    setSelectedLectureId(null);
+    setDashboard(null);
+    setSlidesByLecture({});
+    setView("home");
+  }
+
+  async function handleAuthSubmit(e, authData) {
+    e.preventDefault();
+
+    try {
+      setAuthLoading(true);
+
+      const endpoint = authMode === "login" ? "/auth/login" : "/auth/register";
+
+      const payload =
+        authMode === "login"
+          ? {
+              email: authData.email,
+              password: authData.password,
+            }
+          : {
+              name: authData.name,
+              email: authData.email,
+              password: authData.password,
+            };
+
+      const response = await axios.post(`${API_URL}${endpoint}`, payload);
+
+      const accessToken =
+        response.data.access_token ||
+        response.data.token ||
+        response.data.accessToken;
+
+      if (!accessToken) {
+        alert("Account created. Now login.");
+        setAuthMode("login");
+        return;
+      }
+
+      handleLoginSuccess(accessToken);
+    } catch (error) {
+      console.error(error);
+      alert(error.response?.data?.detail || "Authentication error");
+    } finally {
+      setAuthLoading(false);
+    }
+  }
 
   async function loadLectures() {
     try {
-      const response = await axios.get(`${API_URL}/lectures`);
+      const response = await axios.get(`${API_URL}/lectures`, authHeaders);
       setLectures(response.data);
 
       response.data.forEach((lecture) => {
@@ -52,12 +121,19 @@ function App() {
       });
     } catch (error) {
       console.error(error);
+
+      if (error.response?.status === 401) {
+        logout();
+      }
     }
   }
 
   async function loadSlides(id) {
     try {
-      const response = await axios.get(`${API_URL}/lectures/${id}/slides`);
+      const response = await axios.get(
+        `${API_URL}/lectures/${id}/slides`,
+        authHeaders
+      );
 
       setSlidesByLecture((prev) => ({
         ...prev,
@@ -70,7 +146,10 @@ function App() {
 
   async function loadDashboard(id) {
     try {
-      const response = await axios.get(`${API_URL}/dashboard/${id}/data`);
+      const response = await axios.get(
+        `${API_URL}/dashboard/${id}/data`,
+        authHeaders
+      );
       setDashboard(response.data);
       await loadSlides(id);
     } catch (error) {
@@ -82,7 +161,7 @@ function App() {
     e.preventDefault();
 
     try {
-      await axios.post(`${API_URL}/lectures`, formData);
+      await axios.post(`${API_URL}/lectures`, formData, authHeaders);
 
       setFormData({
         title: "",
@@ -106,7 +185,11 @@ function App() {
     form.append("file", file);
 
     try {
-      await axios.post(`${API_URL}/lectures/${id}/upload-slide`, form);
+      await axios.post(
+        `${API_URL}/lectures/${id}/upload-slide`,
+        form,
+        authHeaders
+      );
       await loadSlides(id);
       alert("Slide uploaded!");
     } catch (error) {
@@ -117,7 +200,10 @@ function App() {
 
   async function loadSlideSummary(slideId) {
     try {
-      const response = await axios.get(`${API_URL}/slides/${slideId}/summary`);
+      const response = await axios.get(
+        `${API_URL}/slides/${slideId}/summary`,
+        authHeaders
+      );
 
       setSlideSummaries((prev) => ({
         ...prev,
@@ -139,7 +225,8 @@ function App() {
 
       const response = await axios.post(
         `${API_URL}/lectures/${selectedLectureId}/rag-answer`,
-        form
+        form,
+        authHeaders
       );
 
       setAiAnswer(response.data.answer);
@@ -166,6 +253,17 @@ function App() {
     });
   }
 
+  if (!token) {
+    return (
+      <AuthScreen
+        authMode={authMode}
+        setAuthMode={setAuthMode}
+        authLoading={authLoading}
+        handleAuthSubmit={handleAuthSubmit}
+      />
+    );
+  }
+
   return (
     <div className={isPresentation ? "app-shell presentation-shell" : "app-shell"}>
       {!isPresentation && (
@@ -174,6 +272,7 @@ function App() {
           selectedLectureId={selectedLectureId}
           openDashboard={openDashboard}
           setView={setView}
+          logout={logout}
         />
       )}
 
@@ -218,6 +317,7 @@ function App() {
             openDashboard={openDashboard}
             setView={setView}
             loadLectures={loadLectures}
+            token={token}
           />
         )}
       </main>
@@ -225,7 +325,92 @@ function App() {
   );
 }
 
-function Sidebar({ lectures, selectedLectureId, openDashboard, setView }) {
+function AuthScreen({ authMode, setAuthMode, authLoading, handleAuthSubmit }) {
+  const [authData, setAuthData] = useState({
+    name: "",
+    email: "",
+    password: "",
+  });
+
+  function handleAuthChange(e) {
+    setAuthData({
+      ...authData,
+      [e.target.name]: e.target.value,
+    });
+  }
+
+  return (
+    <div className="auth-page">
+      <div className="auth-card">
+        <div className="brand auth-brand">
+          <div className="logo-fallback">A</div>
+          <div>
+            <h1>Aurevix</h1>
+            <p>Speaker AI</p>
+          </div>
+        </div>
+
+        <div>
+          <p className="eyebrow">Secure access</p>
+          <h2>{authMode === "login" ? "Login" : "Create account"}</h2>
+          <p className="muted">
+            Access your AI-powered presentation dashboard.
+          </p>
+        </div>
+
+        <form onSubmit={(e) => handleAuthSubmit(e, authData)}>
+          {authMode === "register" && (
+            <input
+              name="name"
+              placeholder="Name"
+              value={authData.name}
+              onChange={handleAuthChange}
+            />
+          )}
+
+          <input
+            name="email"
+            type="email"
+            placeholder="Email"
+            value={authData.email}
+            onChange={handleAuthChange}
+            required
+          />
+
+          <input
+            name="password"
+            type="password"
+            placeholder="Password"
+            value={authData.password}
+            onChange={handleAuthChange}
+            required
+          />
+
+          <button className="primary-btn" disabled={authLoading}>
+            {authLoading
+              ? "Please wait..."
+              : authMode === "login"
+              ? "Login"
+              : "Create account"}
+          </button>
+        </form>
+
+        <button
+          className="secondary-btn"
+          onClick={() =>
+            setAuthMode(authMode === "login" ? "register" : "login")
+          }
+        >
+          {authMode === "login"
+            ? "Create a new account"
+            : "Already have an account? Login"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function Sidebar({ lectures, selectedLectureId, openDashboard, setView, logout }) {
   return (
     <aside className="sidebar">
       <div>
@@ -240,6 +425,7 @@ function Sidebar({ lectures, selectedLectureId, openDashboard, setView }) {
         <nav className="nav">
           <button onClick={() => setView("home")}>Home</button>
           <button onClick={() => setView("create")}>New lecture</button>
+          <button onClick={logout}>Logout</button>
         </nav>
 
         <div className="sidebar-section">
@@ -268,19 +454,17 @@ function Sidebar({ lectures, selectedLectureId, openDashboard, setView }) {
 
       <div className="sidebar-footer">
         <span className="status-dot"></span>
-        Local server running
+        Online server running
       </div>
     </aside>
   );
 }
 
-function Home({
-  lectures,
-  slidesByLecture,
-  openDashboard,
-  setView,
-  loadLectures,
-}) {
+function Home({ lectures, slidesByLecture, openDashboard, setView, loadLectures, token }) {
+  const authHeaders = token
+    ? { headers: { Authorization: `Bearer ${token}` } }
+    : {};
+
   return (
     <div className="page">
       <header className="top-header">
@@ -358,8 +542,17 @@ function Home({
                           if (!confirmDelete) return;
 
                           try {
+                            const authHeaders = token
+                              ? {
+                                  headers: {
+                                    Authorization: `Bearer ${token}`,
+                                  },
+                                }
+                              : {};
+
                             await axios.delete(
-                              `${API_URL}/lectures/${lecture.id}`
+                              `${API_URL}/lectures/${lecture.id}`,
+                              authHeaders
                             );
 
                             await loadLectures();
@@ -629,17 +822,9 @@ function PresentationMode({ dashboard, slides, setView }) {
 
   useEffect(() => {
     function handleKeyDown(e) {
-      if (e.key === "ArrowRight") {
-        nextSlide();
-      }
-
-      if (e.key === "ArrowLeft") {
-        prevSlide();
-      }
-
-      if (e.key === "Escape") {
-        setView("dashboard");
-      }
+      if (e.key === "ArrowRight") nextSlide();
+      if (e.key === "ArrowLeft") prevSlide();
+      if (e.key === "Escape") setView("dashboard");
     }
 
     window.addEventListener("keydown", handleKeyDown);
@@ -658,10 +843,7 @@ function PresentationMode({ dashboard, slides, setView }) {
         </div>
 
         <div style={{ display: "flex", gap: "10px" }}>
-          <button
-            className="secondary-btn small"
-            onClick={toggleFullscreen}
-          >
+          <button className="secondary-btn small" onClick={toggleFullscreen}>
             Fullscreen
           </button>
 

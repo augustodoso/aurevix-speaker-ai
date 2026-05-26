@@ -4,8 +4,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from app.database.database import engine, SessionLocal, Base
-from app.database.models import Lecture, Question, Slide, SlideChunk
-from app.schemas import LectureCreate, QuestionCreate
+from app.database.models import Lecture, Question, Slide, SlideChunk, User
+from app.schemas import LectureCreate, QuestionCreate, UserCreate, UserLogin
+from app.auth import hash_password, verify_password, create_access_token
 
 from app.services.ai_service import (
     analyze_questions,
@@ -95,6 +96,85 @@ def home():
 @app.get("/health")
 def health():
     return {"status": "ok"}
+@app.post("/auth/register")
+def register_user(data: UserCreate):
+    db = SessionLocal()
+
+    existing_user = db.query(User).filter(
+        User.email == data.email
+    ).first()
+
+    if existing_user:
+        db.close()
+        raise HTTPException(
+            status_code=400,
+            detail="Email already registered"
+        )
+
+    user = User(
+        name=data.name,
+        email=data.email,
+        hashed_password=hash_password(data.password)
+    )
+
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    db.close()
+
+    return {
+        "message": "User created successfully",
+        "user": {
+            "id": user.id,
+            "name": user.name,
+            "email": user.email
+        }
+    }
+
+
+@app.post("/auth/login")
+def login_user(data: UserLogin):
+    db = SessionLocal()
+
+    user = db.query(User).filter(
+        User.email == data.email
+    ).first()
+
+    if not user:
+        db.close()
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid email or password"
+        )
+
+    password_is_valid = verify_password(
+        data.password,
+        user.hashed_password
+    )
+
+    if not password_is_valid:
+        db.close()
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid email or password"
+        )
+
+    token = create_access_token({
+        "sub": str(user.id),
+        "email": user.email
+    })
+
+    db.close()
+
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "user": {
+            "id": user.id,
+            "name": user.name,
+            "email": user.email
+        }
+    }
 
 
 @app.post("/lectures")
