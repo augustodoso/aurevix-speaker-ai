@@ -192,6 +192,13 @@ def login_user(data: UserLogin):
         },
     }
 
+@app.get("/auth/me")
+def get_me(current_user: User = Depends(get_current_user)):
+    return {
+        "id": current_user.id,
+        "name": current_user.name,
+        "email": current_user.email,
+    }
 
 @app.post("/lectures")
 def create_lecture(
