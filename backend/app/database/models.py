@@ -51,3 +51,13 @@ class SlideChunk(Base):
     lecture_id = Column(Integer, ForeignKey("lectures.id"))
 
     content = Column(Text)
+
+
+class GeneratedPresentation(Base):
+    __tablename__ = "generated_presentations"
+
+    id = Column(Integer, primary_key=True, index=True)
+    owner_id = Column(Integer, ForeignKey("users.id"))
+
+    topic = Column(String)
+    slides_json = Column(Text)

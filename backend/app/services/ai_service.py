@@ -307,3 +307,49 @@ Return:
     """
 
     return ask_openai(prompt)
+
+def generate_ai_presentation(topic: str):
+
+    if not topic:
+        return []
+
+    prompt = f"""
+You are Aurevix Speaker AI.
+
+Create a professional presentation about:
+
+"{topic}"
+
+Return ONLY valid JSON.
+
+Format exactly like this:
+
+[
+  {{
+    "title": "Slide title",
+    "content": [
+      "bullet point",
+      "bullet point",
+      "bullet point"
+    ],
+    "speaker_notes": "Short speaker notes"
+  }}
+]
+
+Rules:
+- Create exactly 6 slides.
+- Each slide must have 3 to 5 bullet points.
+- Speaker notes must be practical and presentation-ready.
+- Do not return markdown.
+- Do not return explanations.
+- Do not wrap the JSON in code blocks.
+- Return only valid JSON.
+    """
+
+    response = ask_openai(prompt)
+
+    try:
+        import json
+        return json.loads(response)
+    except Exception:
+        return []

@@ -2,9 +2,10 @@ from fastapi import FastAPI, HTTPException, Form, WebSocket, UploadFile, File, D
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from pptx import Presentation
 
 from app.database.database import engine, SessionLocal, Base
-from app.database.models import Lecture, Question, Slide, SlideChunk, User
+from app.database.models import Lecture, Question, Slide, SlideChunk, User, GeneratedPresentation
 from app.schemas import LectureCreate, QuestionCreate, UserCreate, UserLogin
 from app.auth import hash_password, verify_password, create_access_token, get_current_user
 
@@ -18,6 +19,7 @@ from app.services.ai_service import (
     generate_slide_based_response,
     build_lecture_context,
     generate_contextual_answer,
+    generate_ai_presentation,
 )
 
 from app.services.slide_service import extract_pdf_text
@@ -26,7 +28,7 @@ from app.services.thumbnail_service import generate_pdf_thumbnail
 
 import qrcode
 import os
-
+import json
 
 app = FastAPI(
     title="Aurevix Speaker AI",
@@ -200,6 +202,19 @@ def get_me(current_user: User = Depends(get_current_user)):
         "email": current_user.email,
     }
 
+@app.post("/ai/generate-presentation")
+def ai_generate_presentation(
+    topic: str = Form(...),
+    current_user: User = Depends(get_current_user),
+):
+    slides = generate_ai_presentation(topic)
+
+    return {
+        "topic": topic,
+        "slides": slides,
+        "user_id": current_user.id,
+    }
+
 @app.post("/lectures")
 def create_lecture(
     data: LectureCreate,
@@ -260,6 +275,163 @@ def get_lectures(
     db.close()
     return result
 
+@app.post("/ai/export-pptx")
+def export_pptx(
+    topic: str = Form(...),
+    current_user: User = Depends(get_current_user),
+):
+    slides = generate_ai_presentation(topic)
+
+    if not slides:
+        raise HTTPException(
+            status_code=400,
+            detail="Could not generate presentation"
+        )
+
+    prs = Presentation()
+
+    for slide_data in slides:
+
+        slide_layout = prs.slide_layouts[1]
+        slide = prs.slides.add_slide(slide_layout)
+
+        title = slide.shapes.title
+        content = slide.placeholders[1]
+
+        title.text = slide_data.get("title", "Slide")
+
+        bullet_points = slide_data.get("content", [])
+
+        text_frame = content.text_frame
+        text_frame.clear()
+
+        for index, point in enumerate(bullet_points):
+
+            if index == 0:
+                p = text_frame.paragraphs[0]
+            else:
+                p = text_frame.add_paragraph()
+
+            p.text = point
+
+    os.makedirs("storage/presentations", exist_ok=True)
+
+    safe_topic = topic.replace(" ", "_").lower()
+
+    file_path = f"storage/presentations/{safe_topic}.pptx"
+
+    prs.save(file_path)
+
+    return FileResponse(
+        file_path,
+        media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        filename=f"{safe_topic}.pptx"
+    )
+
+@app.post("/ai/save-presentation")
+def save_generated_presentation(
+    topic: str = Form(...),
+    slides_json: str = Form(...),
+    current_user: User = Depends(get_current_user),
+):
+    db = SessionLocal()
+
+    presentation = GeneratedPresentation(
+        owner_id=current_user.id,
+        topic=topic,
+        slides_json=slides_json,
+    )
+
+    db.add(presentation)
+    db.commit()
+    db.refresh(presentation)
+
+    result = {
+        "message": "Presentation saved successfully",
+        "presentation": {
+            "id": presentation.id,
+            "topic": presentation.topic,
+            "slides": json.loads(presentation.slides_json),
+        },
+    }
+
+    db.close()
+    return result
+
+
+@app.get("/ai/generated-presentations")
+def list_generated_presentations(
+    current_user: User = Depends(get_current_user),
+):
+    db = SessionLocal()
+
+    presentations = db.query(GeneratedPresentation).filter(
+        GeneratedPresentation.owner_id == current_user.id
+    ).all()
+
+    result = [
+        {
+            "id": item.id,
+            "topic": item.topic,
+            "slides": json.loads(item.slides_json),
+        }
+        for item in presentations
+    ]
+
+    db.close()
+    return result
+
+
+@app.get("/ai/generated-presentations/{presentation_id}")
+def get_generated_presentation(
+    presentation_id: int,
+    current_user: User = Depends(get_current_user),
+):
+    db = SessionLocal()
+
+    presentation = db.query(GeneratedPresentation).filter(
+        GeneratedPresentation.id == presentation_id,
+        GeneratedPresentation.owner_id == current_user.id,
+    ).first()
+
+    if not presentation:
+        db.close()
+        raise HTTPException(status_code=404, detail="Presentation not found")
+
+    result = {
+        "id": presentation.id,
+        "topic": presentation.topic,
+        "slides": json.loads(presentation.slides_json),
+    }
+
+    db.close()
+    return result
+
+
+@app.delete("/ai/generated-presentations/{presentation_id}")
+def delete_generated_presentation(
+    presentation_id: int,
+    current_user: User = Depends(get_current_user),
+):
+    db = SessionLocal()
+
+    presentation = db.query(GeneratedPresentation).filter(
+        GeneratedPresentation.id == presentation_id,
+        GeneratedPresentation.owner_id == current_user.id,
+    ).first()
+
+    if not presentation:
+        db.close()
+        raise HTTPException(status_code=404, detail="Presentation not found")
+
+    db.delete(presentation)
+    db.commit()
+    db.close()
+
+    return {
+        "message": "Presentation deleted successfully",
+        "presentation_id": presentation_id,
+    }
 
 @app.post("/questions")
 def create_question(data: QuestionCreate):
