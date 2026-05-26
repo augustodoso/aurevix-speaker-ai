@@ -404,6 +404,7 @@ function App() {
             generatorTopic={generatorTopic}
             setGeneratorTopic={setGeneratorTopic}
             generatedPresentation={generatedPresentation}
+            setGeneratedPresentation={setGeneratedPresentation}
             generatorLoading={generatorLoading}
             generatePresentation={generatePresentation}
             savePresentation={savePresentation}
@@ -746,6 +747,7 @@ function AIPresentationGenerator({
   generatorTopic,
   setGeneratorTopic,
   generatedPresentation,
+  setGeneratedPresentation,
   generatorLoading,
   generatePresentation,
   savePresentation,
@@ -753,6 +755,10 @@ function AIPresentationGenerator({
   openSavedPresentation,
   deleteGeneratedPresentation,
 }) {
+  const [editingSlideIndex, setEditingSlideIndex] = useState(null);
+  const [editedTitle, setEditedTitle] = useState("");
+  const [editedContent, setEditedContent] = useState("");
+
   async function exportPresentation() {
     if (!generatorTopic.trim()) {
       alert("Please enter a presentation topic first.");
@@ -785,6 +791,28 @@ function AIPresentationGenerator({
       console.error(error);
       alert("Error exporting PowerPoint");
     }
+  }
+
+  function startEditingSlide(slide, index) {
+    setEditingSlideIndex(index);
+    setEditedTitle(slide.title || "");
+    setEditedContent((slide.content || []).join("\n"));
+  }
+
+  function saveSlideEdit(index) {
+    const updatedSlides = [...generatedPresentation];
+
+    updatedSlides[index] = {
+      ...updatedSlides[index],
+      title: editedTitle,
+      content: editedContent
+        .split("\n")
+        .map((item) => item.trim())
+        .filter((item) => item !== ""),
+    };
+
+    setGeneratedPresentation(updatedSlides);
+    setEditingSlideIndex(null);
   }
 
   return (
@@ -853,7 +881,6 @@ function AIPresentationGenerator({
                 </div>
 
                 <h3>{item.topic}</h3>
-
                 <p className="muted">{item.slides?.length || 0} slides saved.</p>
 
                 <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
@@ -891,18 +918,49 @@ function AIPresentationGenerator({
                   <span>Slide {index + 1}</span>
                 </div>
 
-                <h3>{slide.title}</h3>
+                {editingSlideIndex === index ? (
+                  <>
+                    <input
+                      value={editedTitle}
+                      onChange={(e) => setEditedTitle(e.target.value)}
+                    />
 
-                <ul>
-                  {slide.content?.map((item, idx) => (
-                    <li key={idx}>{item}</li>
-                  ))}
-                </ul>
+                    <textarea
+                      rows="8"
+                      value={editedContent}
+                      onChange={(e) => setEditedContent(e.target.value)}
+                    />
 
-                <div className="speaker-notes">
-                  <strong>Speaker Notes</strong>
-                  <p>{slide.speaker_notes}</p>
-                </div>
+                    <button
+                      className="primary-btn"
+                      onClick={() => saveSlideEdit(index)}
+                    >
+                      Save Slide
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <h3>{slide.title}</h3>
+
+                    <ul>
+                      {slide.content?.map((item, idx) => (
+                        <li key={idx}>{item}</li>
+                      ))}
+                    </ul>
+
+                    <div className="speaker-notes">
+                      <strong>Speaker Notes</strong>
+                      <p>{slide.speaker_notes}</p>
+                    </div>
+
+                    <button
+                      className="secondary-btn"
+                      onClick={() => startEditingSlide(slide, index)}
+                    >
+                      Edit Slide
+                    </button>
+                  </>
+                )}
               </div>
             ))}
           </div>
