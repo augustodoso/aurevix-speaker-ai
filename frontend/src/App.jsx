@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
 import "./App.css";
+import aurevixLogo from "./assets/aurevix-logo.png";
 
 const API_URL = "https://aurevix-speaker-ai.onrender.com";
 const TOKEN_KEY = "aurevix_speaker_token";
@@ -489,7 +490,11 @@ function AuthScreen({ authMode, setAuthMode, authLoading, handleAuthSubmit }) {
     <div className="auth-page">
       <div className="auth-card">
         <div className="brand auth-brand">
-          <div className="logo-fallback">A</div>
+          <img
+              src={aurevixLogo}
+              alt="Aurevix Logo"
+              className="sidebar-logo"
+/>
           <div>
             <h1>Aurevix</h1>
             <p>Speaker AI</p>
