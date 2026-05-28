@@ -422,6 +422,8 @@ return () => socket.close();
             savedPresentations={savedPresentations}
             openSavedPresentation={openSavedPresentation}
             deleteGeneratedPresentation={deleteGeneratedPresentation}
+            authHeaders={authHeaders}
+            showToast={showToast}
           />
         )}
 
@@ -776,6 +778,8 @@ function AIPresentationGenerator({
   savedPresentations,
   openSavedPresentation,
   deleteGeneratedPresentation,
+  authHeaders,
+  showToast,
 }) {
   const [editingSlideIndex, setEditingSlideIndex] = useState(null);
   const [editedTitle, setEditedTitle] = useState("");
