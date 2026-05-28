@@ -1032,6 +1032,82 @@ function AIPresentationGenerator({
                 >
                  Improve Slide
                 </button>
+                <button
+                  className="secondary-btn"
+                  onClick={async () => {
+
+                    try {
+
+                      const response = await axios.post(
+                        `${API_URL}/ai/regenerate-slide`,
+                        {
+                          title: slide.title,
+                          content: slide.content,
+                          mode: "shorter"
+                        },
+                        authHeaders
+                      );
+
+                      const updatedSlides = [...generatedPresentation];
+
+                      updatedSlides[index] = response.data.result;
+
+                      setGeneratedPresentation(updatedSlides);
+
+                      showToast("Shorter slide created!");
+
+                      } catch (error) {
+
+                        console.error(error);
+
+                        showToast(
+                          "Error creating shorter slide",
+                          "error"
+                        );
+                      }
+
+                    }}
+                  >
+                  Shorter
+                </button>
+                <button
+                  className="secondary-btn"
+                  onClick={async () => {
+
+                    try {
+
+                      const response = await axios.post(
+                        `${API_URL}/ai/regenerate-slide`,
+                        {
+                          title: slide.title,
+                          content: slide.content,
+                          mode: "investor"
+                        },
+                        authHeaders
+                      );
+
+                      const updatedSlides = [...generatedPresentation];
+
+                      updatedSlides[index] = response.data.result;
+
+                      setGeneratedPresentation(updatedSlides);
+
+                      showToast("Investor version created!");
+
+                    } catch (error) {
+
+                      console.error(error);
+
+                      showToast(
+                        "Error creating investor slide",
+                        "error"
+                      );
+                    }
+
+                  }}
+                >
+                  Investor
+                </button>
                   </>
                 )}
               </div>
