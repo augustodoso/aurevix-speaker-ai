@@ -1004,7 +1004,8 @@ function AIPresentationGenerator({
                           `${API_URL}/ai/regenerate-slide`,
                         {
                           title: slide.title,
-                          content: slide.content
+                          content: slide.content,
+                          mode: "technical"
                         },
                         authHeaders
                       );

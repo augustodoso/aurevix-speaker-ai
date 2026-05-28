@@ -1129,8 +1129,9 @@ def regenerate_slide_route(
 
     result = regenerate_slide(
         data["title"],
-        data["content"]
-    )
+        data["content"],
+        data.get("mode", "improve")
+)
 
     return {
         "result": result

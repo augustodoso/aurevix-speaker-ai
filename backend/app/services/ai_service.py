@@ -360,7 +360,8 @@ Rules:
 
 def regenerate_slide(
     title: str,
-    content: list
+    content: list,
+    mode: str = "improve"
 ):
 
     prompt = f"""
@@ -388,6 +389,8 @@ Format exactly like this:
   "speaker_notes": "Improved short speaker notes"
 }}
 
+Mode:
+{mode}
 Rules:
 - Keep the same general idea.
 - Make the slide clearer, more professional and more presentation-ready.
