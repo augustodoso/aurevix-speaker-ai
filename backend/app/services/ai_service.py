@@ -1,6 +1,7 @@
 from openai import OpenAI
 from dotenv import load_dotenv
 import os
+import json
 
 load_dotenv()
 
@@ -253,6 +254,7 @@ Return:
 
     return ask_openai(prompt)
 
+
 def build_lecture_context(
     lecture_title: str,
     lecture_topic: str,
@@ -282,6 +284,7 @@ Previous audience questions:
 
     return context
 
+
 def generate_contextual_answer(
     question: str,
     lecture_context: str
@@ -307,6 +310,7 @@ Return:
     """
 
     return ask_openai(prompt)
+
 
 def generate_ai_presentation(topic: str):
 
@@ -349,7 +353,59 @@ Rules:
     response = ask_openai(prompt)
 
     try:
-        import json
         return json.loads(response)
     except Exception:
         return []
+
+
+def regenerate_slide(
+    title: str,
+    content: list
+):
+
+    prompt = f"""
+You are Aurevix Speaker AI.
+
+Improve the following presentation slide.
+
+Current slide title:
+{title}
+
+Current slide bullet points:
+{content}
+
+Return ONLY valid JSON.
+
+Format exactly like this:
+
+{{
+  "title": "Improved slide title",
+  "content": [
+    "improved bullet point",
+    "improved bullet point",
+    "improved bullet point"
+  ],
+  "speaker_notes": "Improved short speaker notes"
+}}
+
+Rules:
+- Keep the same general idea.
+- Make the slide clearer, more professional and more presentation-ready.
+- Use 3 to 5 bullet points.
+- Keep bullet points concise.
+- Do not return markdown.
+- Do not explain.
+- Do not wrap the JSON in code blocks.
+- Return only valid JSON.
+    """
+
+    response = ask_openai(prompt)
+
+    try:
+        return json.loads(response)
+    except Exception:
+        return {
+            "title": title,
+            "content": content,
+            "speaker_notes": response
+        }

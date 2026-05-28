@@ -20,6 +20,7 @@ from app.services.ai_service import (
     build_lecture_context,
     generate_contextual_answer,
     generate_ai_presentation,
+    regenerate_slide
 )
 
 from app.services.slide_service import extract_pdf_text
@@ -1120,6 +1121,20 @@ def delete_lecture(
         "lecture_id": lecture_id,
     }
 
+@app.post("/ai/regenerate-slide")
+def regenerate_slide_route(
+    data: dict,
+    current_user: User = Depends(get_current_user),
+):
+
+    result = regenerate_slide(
+        data["title"],
+        data["content"]
+    )
+
+    return {
+        "result": result
+    }
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):

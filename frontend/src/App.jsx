@@ -990,6 +990,43 @@ function AIPresentationGenerator({
                     >
                       Edit Slide
                     </button>
+                    <button
+                      className="secondary-btn"
+                      onClick={async () => {
+
+                        try {
+
+                          const response = await axios.post(
+                          `${API_URL}/ai/regenerate-slide`,
+                        {
+                          title: slide.title,
+                          content: slide.content
+                        },
+                        authHeaders
+                      );
+
+                      const updatedSlides = [...generatedPresentation];
+
+                      updatedSlides[index] = response.data.result;
+
+                      setGeneratedPresentation(updatedSlides);
+
+                      showToast("Slide improved!");
+
+                    } catch (error) {
+
+                      console.error(error);
+
+                      showToast(
+                        "Error improving slide",
+                        "error"
+                     );
+                    }
+
+                  }}
+                >
+                 Improve Slide
+                </button>
                   </>
                 )}
               </div>
