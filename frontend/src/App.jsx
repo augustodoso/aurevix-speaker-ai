@@ -424,6 +424,7 @@ return () => socket.close();
             deleteGeneratedPresentation={deleteGeneratedPresentation}
             authHeaders={authHeaders}
             showToast={showToast}
+            setView={setView}
           />
         )}
 
@@ -445,12 +446,28 @@ return () => socket.close();
         )}
 
         {view === "presentation" && dashboard && (
-          <PresentationMode
-            dashboard={dashboard}
-            slides={slidesByLecture[selectedLectureId] || []}
-            setView={setView}
-          />
-        )}
+              <PresentationMode
+                dashboard={dashboard}
+                slides={
+                  generatedPresentation.length > 0
+                    ? generatedPresentation
+                    : slidesByLecture[selectedLectureId] || []
+                }
+                setView={setView}
+              />
+            )}
+
+        {view === "audience-screen" && (
+            <AudienceScreen
+              dashboard={dashboard}
+              slides={
+                generatedPresentation.length > 0
+                  ? generatedPresentation
+                  : slidesByLecture[selectedLectureId] || []
+              }
+              setView={setView}
+            />
+          )}
 
         {view === "home" && (
           <Home
@@ -780,6 +797,7 @@ function AIPresentationGenerator({
   deleteGeneratedPresentation,
   authHeaders,
   showToast,
+  setView,
 }) {
   const [editingSlideIndex, setEditingSlideIndex] = useState(null);
   const [editedTitle, setEditedTitle] = useState("");
@@ -897,6 +915,13 @@ function AIPresentationGenerator({
             disabled={generatorLoading || generatedPresentation.length === 0}
           >
             Save Presentation
+          </button>
+          <button
+            className="secondary-btn"
+            onClick={() => setView("audience-screen")}
+            disabled={generatedPresentation.length === 0}
+          >
+            Open Audience Screen
           </button>
         </div>
       </section>
@@ -1205,6 +1230,13 @@ function Dashboard({
             Presentation Mode
           </button>
 
+          <button
+            className="secondary-btn small"
+            onClick={() => setView("audience-screen")}
+          >
+            Audience Screen
+          </button>
+
           <button className="secondary-btn small" onClick={() => setView("home")}>
             Back home
           </button>
@@ -1379,6 +1411,16 @@ function PresentationMode({ dashboard, slides, setView }) {
           <section className="big-slide">
             {slide?.thumbnail_url ? (
               <img src={slide.thumbnail_url} alt={slide.filename} />
+            ) : slide?.title && slide?.content ? (
+              <div className="presentation-generated-slide">
+                <h1>{slide.title}</h1>
+
+                <ul>
+                  {slide.content.map((item, index) => (
+                    <li key={index}>{item}</li>
+                  ))}
+                </ul>
+              </div>
             ) : (
               <div className="slide-placeholder">
                 <h1>{dashboard.lecture.title}</h1>
@@ -1386,6 +1428,13 @@ function PresentationMode({ dashboard, slides, setView }) {
               </div>
             )}
           </section>
+
+            {slide?.speaker_notes && (
+              <div className="teleprompter-box">
+                <strong>Speaker Notes</strong>
+                <p>{slide.speaker_notes}</p>
+              </div>
+            )}
 
           <div className="slide-controls">
             <button onClick={prevSlide}>← Previous</button>
@@ -1432,6 +1481,94 @@ function PresentationMode({ dashboard, slides, setView }) {
             </a>
           </div>
         </aside>
+      </div>
+    </div>
+  );
+}
+
+function AudienceScreen({ dashboard, slides, setView }) {
+  const [currentSlide, setCurrentSlide] = useState(0);
+
+  const slide = slides[currentSlide];
+
+  function nextSlide() {
+    if (currentSlide < slides.length - 1) {
+      setCurrentSlide((prev) => prev + 1);
+    }
+  }
+
+  function prevSlide() {
+    if (currentSlide > 0) {
+      setCurrentSlide((prev) => prev - 1);
+    }
+  }
+
+  function toggleFullscreen() {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen();
+    } else {
+      document.exitFullscreen();
+    }
+  }
+
+  useEffect(() => {
+    function handleKeyDown(e) {
+      if (e.key === "ArrowRight") nextSlide();
+      if (e.key === "ArrowLeft") prevSlide();
+      if (e.key === "Escape") setView("dashboard");
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [currentSlide, slides.length]);
+
+  return (
+    <div className="audience-screen">
+      <div className="audience-topbar">
+        <button className="secondary-btn small" onClick={toggleFullscreen}>
+          Fullscreen
+        </button>
+
+        <button
+          className="secondary-btn small"
+          onClick={() => setView("dashboard")}
+        >
+          Back
+        </button>
+      </div>
+
+      <div className="audience-stage">
+        {slide?.thumbnail_url ? (
+          <img src={slide.thumbnail_url} alt={slide.filename} />
+        ) : slide?.title && slide?.content ? (
+          <div className="audience-generated-slide">
+            <h1>{slide.title}</h1>
+
+            <ul>
+              {slide.content.map((item, index) => (
+                <li key={index}>{item}</li>
+              ))}
+            </ul>
+          </div>
+        ) : (
+          <div className="audience-placeholder">
+            <h1>{dashboard?.lecture?.title || "Presentation"}</h1>
+            <p>{dashboard?.lecture?.topic || "AI Presentation"}</p>
+          </div>
+        )}
+      </div>
+
+      <div className="audience-controls">
+        <button onClick={prevSlide}>←</button>
+
+        <span>
+          {slides.length === 0 ? 0 : currentSlide + 1} / {slides.length}
+        </span>
+
+        <button onClick={nextSlide}>→</button>
       </div>
     </div>
   );
