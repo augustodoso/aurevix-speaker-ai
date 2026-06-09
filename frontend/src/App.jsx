@@ -378,6 +378,10 @@ return () => socket.close();
     });
   }
 
+  if (!token && view === "landing") {
+  return <LandingPage setView={setView} />;
+}
+
   if (!token) {
     return (
       <AuthScreen
