@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import axios from "axios";
 import "./App.css";
 import aurevixLogo from "./assets/aurevix-logo.png";
+import LandingPage from "./components/LandingPage";
 
 const API_URL = "https://aurevix-speaker-ai.onrender.com";
 const TOKEN_KEY = "aurevix_speaker_token";
@@ -12,7 +13,7 @@ function App() {
   const [authMode, setAuthMode] = useState("login");
   const [authLoading, setAuthLoading] = useState(false);
 
-  const [view, setView] = useState("home");  
+  const [view, setView] = useState("landing");  
   const [lectures, setLectures] = useState([]);
   const [selectedLectureId, setSelectedLectureId] = useState(null);
   const [dashboard, setDashboard] = useState(null);
@@ -44,6 +45,7 @@ function App() {
   });
 
   const isPresentation = view === "presentation";
+  const isLanding = view === "landing";
 
   const authHeaders = token
     ? { headers: { Authorization: `Bearer ${token}` } }
@@ -388,8 +390,8 @@ return () => socket.close();
   }
 
   return (
-    <div className={isPresentation ? "app-shell presentation-shell" : "app-shell"}>
-      {!isPresentation && (
+    <div className={isPresentation || isLanding ? "app-shell presentation-shell" : "app-shell"}>     
+     {!isPresentation && !isLanding && (
         <Sidebar
           lectures={lectures}
           selectedLectureId={selectedLectureId}
@@ -401,7 +403,9 @@ return () => socket.close();
       )}
 
       <main className={isPresentation ? "workspace presentation-workspace" : "workspace"}>
-      
+      {view === "landing" && (
+        <LandingPage setView={setView} />
+      )}
         {view === "create" && (
           <CreateLecture
             formData={formData}
