@@ -383,16 +383,20 @@ return () => socket.close();
   return <LandingPage setView={setView} />;
 }
 
-  if (!token) {
-    return (
-      <AuthScreen
-        authMode={authMode}
-        setAuthMode={setAuthMode}
-        authLoading={authLoading}
-        handleAuthSubmit={handleAuthSubmit}
-      />
-    );
-  }
+if (!token && view === "demo") {
+  return <PresentationDemo setView={setView} />;
+}
+
+if (!token) {
+  return (
+    <AuthScreen
+      authMode={authMode}
+      setAuthMode={setAuthMode}
+      authLoading={authLoading}
+      handleAuthSubmit={handleAuthSubmit}
+    />
+  );
+}
 
   return (
     <div className={isPresentation || isLanding ? "app-shell presentation-shell" : "app-shell"}>     
