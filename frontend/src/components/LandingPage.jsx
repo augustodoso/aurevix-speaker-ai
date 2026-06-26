@@ -40,13 +40,23 @@ function LandingPage({ setView }) {
           <div className="hero-buttons">
             <button
               className="primary-btn"
-              onClick={() => setView("generator")}
+              onClick={() => setView("demo")}
             >
-              Generate Presentation
+              🚀 View Live Demo
             </button>
 
-            <button className="secondary-btn" onClick={() => setView("home")}>
-              Open Dashboard
+            <button
+              className="secondary-btn"
+              onClick={() => setView("generator")}
+            >
+              Generate Your Own
+            </button>
+
+            <button
+              className="secondary-btn"
+              onClick={() => setView("home")}
+            >
+              Login
             </button>
           </div>
         </div>

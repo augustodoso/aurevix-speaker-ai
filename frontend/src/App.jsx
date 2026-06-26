@@ -3,6 +3,7 @@ import axios from "axios";
 import "./App.css";
 import aurevixLogo from "./assets/aurevix-logo.png";
 import LandingPage from "./components/LandingPage";
+import PresentationDemo from "./components/PresentationDemo";
 
 const API_URL = "https://aurevix-speaker-ai.onrender.com";
 const TOKEN_KEY = "aurevix_speaker_token";
@@ -409,6 +410,9 @@ return () => socket.close();
       <main className={isPresentation ? "workspace presentation-workspace" : "workspace"}>
       {view === "landing" && (
         <LandingPage setView={setView} />
+      )}
+      {view === "demo" && (
+        <PresentationDemo setView={setView} />
       )}
         {view === "create" && (
           <CreateLecture
